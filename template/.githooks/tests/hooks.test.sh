@@ -230,6 +230,36 @@ mkdir -p "${TMP}/not-a-repo"
 ok "不在 git 仓库内执行 → 非零退出" \
    "$( (cd "${TMP}/not-a-repo" && GIT_CEILING_DIRECTORIES="${TMP}" bash "${HOOKS_DIR}/install.sh" >/dev/null 2>&1); [[ $? -ne 0 ]] && echo yes || echo no)" "yes"
 
+
+echo "▸ 内核文件改动提醒（只提醒，不拦）"
+kit_stamp() {  # kit_stamp <路径>…：按当前工作区内容写 .team-kit.json，模拟 kit 同步后的状态
+  python3 - "$R" "$@" <<'PY'
+import hashlib, json, os, sys
+root, paths = sys.argv[1], sys.argv[2:]
+files = {p: hashlib.sha256(open(os.path.join(root, p), "rb").read()).hexdigest() for p in paths}
+json.dump({"kit_commit": "test", "files": files}, open(os.path.join(root, ".team-kit.json"), "w"))
+PY
+}
+setup_repo; mkdir -p "${R}/docs/rules"; echo "契约 v1" > "${R}/docs/rules/契约.md"
+kit_stamp docs/rules/契约.md; git -C "${R}" add -A; git -C "${R}" commit -qm "sync" 2>/dev/null
+echo "本工程私改" >> "${R}/docs/rules/契约.md"; git -C "${R}" add docs/rules/契约.md
+v=$(commit_verdict "docs: 私改内核")
+ok "私改内核文件：照常放行" "$v" "allow"
+ok "私改内核文件：打印提醒并点名文件" "$(grep -c 'docs/rules/契约.md' "${TMP}/last.out")" "1"
+ok "提醒里给出收回命令" "$(grep -c 'bin/kit adopt' "${TMP}/last.out")" "1"
+echo "契约 v2" > "${R}/docs/rules/契约.md"; kit_stamp docs/rules/契约.md; git -C "${R}" add -A
+commit_verdict "chore: kit sync" >/dev/null
+ok "kit 同步带来的改动（与 .team-kit.json 摘要一致）：不提醒" "$(grep -c '团队基建内核文件' "${TMP}/last.out")" "0"
+git -C "${R}" rm -q docs/rules/契约.md
+commit_verdict "docs: 删内核" >/dev/null
+ok "删除内核文件：提醒" "$(grep -c '契约.md（删除）' "${TMP}/last.out")" "1"
+echo "普通" > "${R}/note.txt"; git -C "${R}" add note.txt
+commit_verdict "docs: 非内核" >/dev/null
+ok "非内核文件改动：不提醒" "$(grep -c '团队基建内核文件' "${TMP}/last.out")" "0"
+setup_repo; mkdir -p "${R}/docs"; echo x > "${R}/docs/a.md"; git -C "${R}" add docs/a.md
+commit_verdict "docs: 无 kit 记录" >/dev/null
+ok "没有 .team-kit.json：不提醒、不报错" "$(grep -c '团队基建内核文件' "${TMP}/last.out"):$(verdict_of_last 0)" "0:allow"
+
 echo
 if [[ "${FAILS}" -gt 0 ]]; then echo "❌ ${FAILS}/${n} 项失败"; exit 1; fi
 echo "✅ 全部通过（${n} 项）"

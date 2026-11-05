@@ -78,6 +78,36 @@ if cred_hit:
     tail_hint()
     sys.exit(1)
 
+# ─── K. 提醒：本次提交改了团队基建内核文件（只提醒，不拦）────────────────
+# 内核文件来自 team-kit，各工程逐字相同；清单与 kit 同步时的摘要在仓库根 .team-kit.json。
+# 暂存内容与记录的摘要相同 ⇒ 是 kit 同步带来的，不提醒；不同或被删 ⇒ 是本工程私改，提醒收回 kit。
+import hashlib, json
+def kernel_reminder():
+    root = git("rev-parse", "--show-toplevel").decode().strip()
+    try:
+        with open(os.path.join(root, ".team-kit.json"), encoding="utf-8") as f:
+            recorded = json.load(f).get("files", {})
+    except (OSError, ValueError):
+        return
+    changed = []
+    entries = git("diff", "--cached", "--name-status", "-z", "--no-renames").split(b"\0")
+    for i in range(0, len(entries) - 1, 2):
+        status, p = entries[i].decode(), entries[i + 1].decode("utf-8", "replace")
+        if p not in recorded:
+            continue
+        if status.startswith("D"):
+            changed.append(p + "（删除）")
+            continue
+        blob = subprocess.run(["git", "show", ":" + p], check=True, stdout=subprocess.PIPE).stdout
+        if hashlib.sha256(blob).hexdigest() != recorded[p]:
+            changed.append(p)
+    if changed:
+        say("ℹ️  本次提交改了团队基建内核文件（来自 team-kit，各工程应逐字相同）：",
+            *("   " + p for p in changed),
+            "   这些改动只在本工程生效，下次 kit sync 会拒绝同步。确属改进的，请收回 team-kit：",
+            "   在 kit 仓库执行 bin/kit adopt <本工程路径>，提交 kit 后再 sync 到各工程。")
+kernel_reminder()
+
 # ─── A2. 提交内容里出现有真值的口令字段 ──────────────────────────────
 # 值必须「像口令」才报：纯 ASCII、去空白后非空、长度 >= 4、不是常见假值与占位。
 #   配置类文件（.env/.ini/.yaml/.conf/.toml/.properties/.sh 等）：裸值与带引号的值都扫。

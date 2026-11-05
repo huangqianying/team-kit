@@ -5,7 +5,8 @@
   bin/kit install <工程> [--allow-dirty]          首次安装：拷内核、建软链、生成工程配置模板、装钩子
   bin/kit sync    <工程> [--force] [--allow-dirty] 同步内核到工程（工程里改过内核文件时拒绝，--force 覆盖）
   bin/kit check   <工程>                          核对一致性；不一致退出 1
-  bin/kit diff    <工程> [路径 …]                 打印工程与内核的差异（回收工程内的改进时用）
+  bin/kit diff    <工程> [路径 …]                 打印工程与内核的差异
+  bin/kit adopt   <工程> [路径 …] [--force]       把工程里改过的内核文件收回 kit 的 template/（不提交）
 
 退出码：0 一致 / 成功 · 1 有差异或被拒 · 2 用法错误
 """
@@ -252,6 +253,62 @@ def apply(project, mode, force=False, allow_dirty=False):
     return 0
 
 
+def adopt(project, paths, force=False):
+    """把工程里改过（或在内核目录里新增）的内核文件拷回 template/。
+
+    保护：kit 在该工程上次同步之后自己又改过同一文件（template 摘要 ≠ .team-kit.json 记录）时，
+    直接拷回会冲掉 kit 的新改动 —— 拒绝该文件，要求人工合并；--force 明确覆盖。
+    """
+    files, dirs = kernel_files()
+    tset = set(files)
+    candidates = list(files)
+    for d in dirs:
+        if os.path.isdir(os.path.join(project, d)):
+            candidates += [r for r in _walk(project, d) if r not in tset]
+    if paths:
+        wanted = {os.path.normpath(p) for p in paths}
+        unknown = sorted(w for w in wanted if w not in set(candidates))
+        if unknown:
+            print("[kit adopt] 这些路径不是内核文件：" + "、".join(unknown), file=sys.stderr)
+            return 2
+        candidates = [c for c in candidates if c in wanted]
+    dirty = git(KIT, "status", "--porcelain", "--", *[os.path.join("template", c) for c in candidates]).stdout.strip()
+    if dirty:
+        print("[kit adopt] 拒绝：kit 的 template/ 里这些文件有未提交改动，先在 kit 提交或处理：", file=sys.stderr)
+        print("  " + dirty.replace("\n", "\n  "), file=sys.stderr)
+        return 1
+    recorded = (read_stamp(project) or {}).get("files", {})
+    adopted, conflicts, missing = [], [], []
+    for rel in candidates:
+        src, dst = os.path.join(project, rel), os.path.join(TEMPLATE, rel)
+        if not os.path.exists(src):
+            if rel in tset:
+                missing.append(rel)
+            continue
+        if os.path.exists(dst) and sha(src) == sha(dst) and is_exec(src) == is_exec(dst):
+            continue
+        if os.path.exists(dst) and rel in recorded and sha(dst) != recorded[rel] and not force:
+            conflicts.append(rel)
+            continue
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy2(src, dst)
+        adopted.append(rel)
+    print(f"[kit adopt] {project} → {TEMPLATE}")
+    for rel in adopted:
+        print("  收回  " + rel)
+    for rel in missing:
+        print(f"  ! {rel} 在工程里被删了；adopt 不删 kit 里的文件，确要删请在 kit 里手工删并改 MANIFEST")
+    if conflicts:
+        print("  ✗ 下列文件在该工程上次同步后 kit 也改过，未收回（bin/kit diff 对照后人工合并，或 --force 覆盖）：")
+        for rel in conflicts:
+            print("    " + rel)
+    if not adopted and not conflicts and not missing:
+        print("  工程与内核一致，没有可收回的改动")
+    if adopted:
+        print("  下一步：在 kit 跑三套测试 → 提交 kit → 对每个工程 bin/kit sync → 各工程提交")
+    return 1 if conflicts else 0
+
+
 def diff(project, paths):
     files, _ = kernel_files()
     targets = paths or files
@@ -281,6 +338,10 @@ def main(argv=None):
     p = sub.add_parser("diff")
     p.add_argument("project")
     p.add_argument("paths", nargs="*")
+    p = sub.add_parser("adopt")
+    p.add_argument("project")
+    p.add_argument("paths", nargs="*")
+    p.add_argument("--force", action="store_true")
     a = ap.parse_args(argv)
     project = os.path.realpath(a.project)
     if not os.path.isdir(project):
@@ -291,6 +352,8 @@ def main(argv=None):
         return 1 if errors else 0
     if a.cmd == "diff":
         return diff(project, a.paths)
+    if a.cmd == "adopt":
+        return adopt(project, a.paths, force=a.force)
     return apply(project, a.cmd, force=getattr(a, "force", False), allow_dirty=a.allow_dirty)
 
 

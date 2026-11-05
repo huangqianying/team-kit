@@ -25,8 +25,11 @@ bin/kit sync /path/to/project
 # 核对工程是否与内核一致（不一致退出 1）
 bin/kit check /path/to/project
 
-# 看工程里对内核做了什么改动（回收改进时用）
+# 看工程里对内核做了什么改动
 bin/kit diff /path/to/project [路径 …]
+
+# 把工程里改过的内核文件收回 kit 的 template/（不提交）
+bin/kit adopt /path/to/project [路径 …] [--force]
 ```
 
 `install` / `sync` 会：拷内核文件（保留可执行位）、建 `.claude/skills` 与 `.codex/skills` → `../skills` 软链、缺工程配置时生成模板（之后不再覆盖）、在 `.gitignore` 补 `.team-ledger/`、执行 `.githooks/install.sh` 设置 `core.hooksPath`、写 `.team-kit.json`（kit 提交号与各内核文件摘要）。它们**不提交**，由工程侧核对后自行提交。
@@ -40,7 +43,9 @@ bin/kit diff /path/to/project [路径 …]
 3. 对每个工程 `bin/kit sync <工程>`，在工程里提交（含 `.team-kit.json`）。
 4. `bin/kit check <工程>` 退出 0。
 
-工程里先改了内核文件（比如值守时顺手修了契约）：`bin/kit diff <工程>` 看改动 → 收进 kit 的 `template/` → 按上面流程同步回所有工程。
+工程里先改了内核文件（比如值守时顺手修了契约）：提交时 `pre-commit` 会打一行提醒（只提醒不拦；与 `.team-kit.json` 记录一致的 kit 同步改动不提醒）。之后在 kit 执行 `bin/kit adopt <工程>` 收回 → 按上面流程测试、提交 kit、同步回所有工程。
+
+`adopt` 的保护：该文件在这个工程上次同步之后 kit 也改过时拒绝收回（避免冲掉 kit 的新改动），用 `bin/kit diff` 对照后人工合并，或 `--force` 明确覆盖；kit 的 `template/` 里要收回的文件有未提交改动时也拒绝；工程里删掉的内核文件不会在 kit 里删，只提示。
 
 ## 新工程首次落地后要做的
 

@@ -146,6 +146,87 @@ def t_diff_shows_change():
     shutil.rmtree(d)
 
 
+
+class temp_kit:
+    """adopt 会写 template/：测试一律在 kit 的临时副本上跑，不碰真实 kit。"""
+    def __enter__(self):
+        self.saved = (kit.KIT, kit.TEMPLATE, kit.PROFILE)
+        self.dir = tempfile.mkdtemp(prefix="kit-copy-")
+        for name in ("template", "profile"):
+            shutil.copytree(os.path.join(self.saved[0], name), os.path.join(self.dir, name), symlinks=True)
+        shutil.copy2(os.path.join(self.saved[0], "MANIFEST"), self.dir)
+        subprocess.run(["git", "init", "-q", self.dir], check=True)
+        subprocess.run(["git", "-C", self.dir, "config", "user.email", "t@example.invalid"], check=True)
+        subprocess.run(["git", "-C", self.dir, "config", "user.name", "t"], check=True)
+        commit_all(self.dir)
+        kit.KIT, kit.TEMPLATE, kit.PROFILE = self.dir, os.path.join(self.dir, "template"), os.path.join(self.dir, "profile")
+        return self.dir
+
+    def __exit__(self, *exc):
+        kit.KIT, kit.TEMPLATE, kit.PROFILE = self.saved
+        shutil.rmtree(self.dir)
+
+
+def t_adopt_pulls_project_edit_back():
+    with temp_kit() as k:
+        d = new_repo()
+        run("install", d)
+        commit_all(d)
+        with open(os.path.join(d, "AGENTS.md"), "a", encoding="utf-8") as f:
+            f.write("\n工程里的改进\n")
+        open(os.path.join(d, "skills/team-ledger/NOTE.md"), "w").write("新增")
+        rc, out = run("adopt", d)
+        ok(rc == 0, "adopt 成功")
+        ok("工程里的改进" in open(os.path.join(k, "template/AGENTS.md"), encoding="utf-8").read(), "改动收回 kit 的 template/")
+        ok(os.path.exists(os.path.join(k, "template/skills/team-ledger/NOTE.md")), "内核目录里新增的文件一并收回")
+        commit_all(d)
+        rc, _ = run("sync", d)
+        ok(rc == 0, "收回后对原工程 sync 不再被拒")
+        errors, _ = kit.check(d, quiet=True)
+        ok(errors == [], "收回并同步后与内核一致")
+        shutil.rmtree(d)
+
+
+def t_adopt_refuses_when_kit_changed_too():
+    with temp_kit() as k:
+        d = new_repo()
+        run("install", d)
+        commit_all(d)
+        with open(os.path.join(k, "template/CLAUDE.md"), "a", encoding="utf-8") as f:
+            f.write("\nkit 的新改动\n")
+        commit_all(k)
+        with open(os.path.join(d, "CLAUDE.md"), "a", encoding="utf-8") as f:
+            f.write("\n工程的改动\n")
+        rc, out = run("adopt", d)
+        ok(rc == 1 and "CLAUDE.md" in out, "kit 同时改过同一文件时拒绝并点名")
+        ok("kit 的新改动" in open(os.path.join(k, "template/CLAUDE.md"), encoding="utf-8").read(), "拒绝时不冲掉 kit 的新改动")
+        rc, _ = run("adopt", d, "--force")
+        ok(rc == 0 and "工程的改动" in open(os.path.join(k, "template/CLAUDE.md"), encoding="utf-8").read(), "--force 明确覆盖")
+        shutil.rmtree(d)
+
+
+def t_adopt_scope_and_guards():
+    with temp_kit() as k:
+        d = new_repo()
+        run("install", d)
+        commit_all(d)
+        for f in ("AGENTS.md", "CLAUDE.md"):
+            with open(os.path.join(d, f), "a", encoding="utf-8") as h:
+                h.write("\n改\n")
+        rc, out = run("adopt", d, "AGENTS.md")
+        ok(rc == 0 and "AGENTS.md" in out and "CLAUDE.md" not in out, "给了路径只收回这些路径")
+        rc, out = run("adopt", d, "src/app.py")
+        ok(rc == 2 and "不是内核文件" in out, "非内核路径报用法错误")
+        with open(os.path.join(k, "template/CLAUDE.md"), "a", encoding="utf-8") as h:
+            h.write("\nkit 里没提交的改动\n")
+        rc, out = run("adopt", d, "CLAUDE.md")
+        ok(rc == 1 and "未提交改动" in out, "要收回的文件在 kit 的 template/ 里有未提交改动时拒绝")
+        commit_all(k)
+        os.remove(os.path.join(d, "docs/rules/roles/qa.md"))
+        rc, out = run("adopt", d, "docs/rules/roles/qa.md")
+        ok(os.path.exists(os.path.join(k, "template/docs/rules/roles/qa.md")) and "被删了" in out, "工程里删掉的内核文件不在 kit 里删，只提示")
+        shutil.rmtree(d)
+
 if __name__ == "__main__":
     for name, fn in sorted((k, v) for k, v in globals().items() if k.startswith("t_")):
         print(name)

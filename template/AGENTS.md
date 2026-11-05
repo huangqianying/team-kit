@@ -13,6 +13,7 @@
 本文、`docs/rules/团队协作契约.md`、`docs/rules/双端协作与交接.md`、`docs/rules/roles/`、两端入口 `.claude/` / `.codex/`、内核 skill 与 `.githooks/` 来自 **team-kit**，清单与来源提交记在仓库根 `.team-kit.json`。
 
 - **内核文件不在本工程单独改。** 要改先在 team-kit 改，再同步到各工程；本工程发现缺口时按基建工作项落账，写明要改的内核文件。
+- 已在本工程改了内核文件的（提交时钩子会提醒），在 team-kit 执行 `bin/kit adopt <本工程路径>` 收回，提交 kit 后再同步到各工程。
 - 工程专属信息只写进 `docs/rules/工程配置.md` 与 `.githooks/project.conf`，同步不覆盖这两份。
 - 是否与 team-kit 一致，用 team-kit 的 `bin/kit check <本工程路径>` 核对。
 
