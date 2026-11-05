@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="system">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>UI 设计规范 · Demo</title>
+<style>
+/* ============ 令牌体系（对应规范 §1–§6） ============ */
+:root{
+  /* accent · System Blue */
+  --accent:#0F62CC; --accent-hover:#0B57B8; --accent-pressed:#08479A;
+  --accent-soft:#EAF3FF; --accent-contrast:#FFFFFF; --accent-ink:#0F62CC;
+  /* 语义 */
+  --success:#187A36; --success-soft:#E8F8ED; --success-ink:#17692F; --success-contrast:#FFFFFF;
+  --warning:#AD5700; --warning-soft:#FFF3D6; --warning-ink:#7A4A00; --warning-contrast:#FFFFFF;
+  --danger:#B42318; --danger-soft:#FDECEB; --danger-ink:#B01F17; --danger-contrast:#FFFFFF;
+  --info:#5AC8FA; --info-soft:#E8F7FF; --info-ink:#0C5E7B; --info-contrast:#0B0F14;
+  /* 语义令牌（亮） */
+  --bg:#F2F4F7; --bg-soft:#F7F8FA; --surface:#FFFFFF; --surface-2:#F7F8FA;
+  --separator:rgba(60,60,67,.11); --border:#E7EAF0; --border-strong:#D7DCE5;
+  --text:#161B22; --text-secondary:#4A5568; --text-tertiary:#616D82;
+  /* 数据可视化 */
+  --viz-1:#007AFF; --viz-2:#14B8A6; --viz-3:#FF9500; --viz-4:#34C759;
+  /* 圆角 */
+  --r-xs:8px; --r-sm:10px; --r-md:12px; --r-lg:16px; --r-xl:20px; --r-full:999px;
+  /* 间距 */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-8:32px;
+  /* 层次 */
+  --elev-1:0 1px 2px rgba(16,24,40,.06),0 4px 12px rgba(16,24,40,.05);
+  --elev-2:0 6px 20px rgba(16,24,40,.10);
+  --elev-3:0 24px 64px rgba(16,24,40,.22);
+  /* 材质 */
+  --material-chrome:rgba(255,255,255,.72); --material-blur:saturate(180%) blur(20px);
+  /* 动效 */
+  --ease-standard:cubic-bezier(.4,0,.2,1); --ease-out:cubic-bezier(.16,1,.3,1);
+  --ease-spring:cubic-bezier(.34,1.56,.64,1);
+  --dur-1:120ms; --dur-2:200ms; --dur-3:320ms; --dur-4:480ms;
+  /* 字体 */
+  --font-sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","PingFang SC","Helvetica Neue","Segoe UI",Roboto,Inter,Arial,sans-serif;
+}
+/* 暗色 */
+:root[data-theme="dark"], :root[data-theme="system"]{ color-scheme:dark; }
+@media (prefers-color-scheme:light){ :root[data-theme="system"]{ color-scheme:light; } }
+:root[data-theme="dark"] .darkvars, :root[data-theme="system"] .darkvars{}
+:root[data-theme="dark"]{
+  --accent:#0A84FF; --accent-hover:#409CFF; --accent-pressed:#2E90FF;
+  --accent-soft:rgba(10,132,255,.16); --accent-contrast:#0B0F14; --accent-ink:#409CFF;
+  --success:#30D158; --success-soft:rgba(48,209,88,.16); --success-ink:#30D158; --success-contrast:#0B0F14;
+  --warning:#FFD60A; --warning-soft:rgba(255,214,10,.16); --warning-ink:#FFD60A; --warning-contrast:#0B0F14;
+  --danger:#FF453A; --danger-soft:rgba(255,69,58,.18); --danger-ink:#FF7A70; --danger-contrast:#0B0F14;
+  --info:#64D2FF; --info-soft:rgba(100,210,255,.18); --info-ink:#64D2FF; --info-contrast:#0B0F14;
+  --bg:#0B0F14; --bg-soft:#141920; --surface:#16191F; --surface-2:#1E232B;
+  --separator:rgba(255,255,255,.10); --border:#2C333D; --border-strong:#3A424E;
+  --text:#F2F4F7; --text-secondary:rgba(235,235,245,.66); --text-tertiary:rgba(235,235,245,.64);
+  --viz-1:#0A84FF; --viz-2:#2DD4BF; --viz-3:#FF9F0A; --viz-4:#30D158;
+  --material-chrome:rgba(22,25,31,.72);
+  --elev-1:0 1px 2px rgba(0,0,0,.5); --elev-2:0 8px 24px rgba(0,0,0,.6); --elev-3:0 32px 80px rgba(0,0,0,.72);
+}
+@media (prefers-color-scheme:dark){
+  :root[data-theme="system"]{
+    --accent:#0A84FF; --accent-hover:#409CFF; --accent-pressed:#2E90FF;
+    --accent-soft:rgba(10,132,255,.16); --accent-contrast:#0B0F14; --accent-ink:#409CFF;
+    --success:#30D158; --success-soft:rgba(48,209,88,.16); --success-ink:#30D158; --success-contrast:#0B0F14;
+    --warning:#FFD60A; --warning-soft:rgba(255,214,10,.16); --warning-ink:#FFD60A; --warning-contrast:#0B0F14;
+    --danger:#FF453A; --danger-soft:rgba(255,69,58,.18); --danger-ink:#FF7A70; --danger-contrast:#0B0F14;
+    --info:#64D2FF; --info-soft:rgba(100,210,255,.18); --info-ink:#64D2FF; --info-contrast:#0B0F14;
+    --bg:#0B0F14; --bg-soft:#141920; --surface:#16191F; --surface-2:#1E232B;
+    --separator:rgba(255,255,255,.10); --border:#2C333D; --border-strong:#3A424E;
+    --text:#F2F4F7; --text-secondary:rgba(235,235,245,.66); --text-tertiary:rgba(235,235,245,.64);
+    --viz-1:#0A84FF; --viz-2:#2DD4BF; --viz-3:#FF9F0A; --viz-4:#30D158;
+    --material-chrome:rgba(22,25,31,.72);
+    --elev-1:0 1px 2px rgba(0,0,0,.5); --elev-2:0 8px 24px rgba(0,0,0,.6); --elev-3:0 32px 80px rgba(0,0,0,.72);
+  }
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;height:100%;}
+body{
+  font-family:var(--font-sans); font-size:15px; color:var(--text);
+  background:var(--bg); -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  transition:background var(--dur-2) var(--ease-standard), color var(--dur-2) var(--ease-standard);
+}
+.tnum{font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1;}
+
+/* ============ 三层工作台（§7–9） ============ */
+.app{display:grid; grid-template-columns:240px 1fr; grid-template-rows:52px 1fr; height:100vh;
+  grid-template-areas:"chrome chrome" "side content";}
+
+/* 顶栏 chrome */
+.chrome{grid-area:chrome; display:flex; align-items:center; gap:var(--sp-3); padding:0 var(--sp-5);
+  background:var(--material-chrome); backdrop-filter:var(--material-blur); -webkit-backdrop-filter:var(--material-blur);
+  border-bottom:1px solid var(--separator); position:sticky; top:0; z-index:30;}
+.logo{width:28px;height:28px;border-radius:var(--r-sm);display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px;
+  background:linear-gradient(135deg,var(--accent),var(--viz-2));}
+.brand{font-size:19px;font-weight:800;letter-spacing:.16em;color:var(--text);padding-left:2px;}
+.app-ver{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;
+  background:var(--accent-soft);color:var(--accent-ink);font-size:12px;font-weight:700;}
+.chrome-spacer{flex:1;}
+.seg{display:inline-flex;background:var(--surface-2);border-radius:var(--r-sm);padding:2px;gap:2px;box-shadow:0 0 0 1px var(--separator) inset;}
+.seg button{border:0;background:transparent;color:var(--text-secondary);font:inherit;font-size:13px;font-weight:600;
+  padding:5px 12px;border-radius:8px;cursor:pointer;transition:all var(--dur-1) var(--ease-standard);}
+.seg button.on{background:var(--surface);color:var(--text);box-shadow:var(--elev-1);}
+.icon-btn{width:36px;height:36px;border:0;border-radius:var(--r-full);background:transparent;cursor:pointer;color:var(--text-secondary);
+  display:grid;place-items:center;font-size:16px;transition:background var(--dur-1);}
+.icon-btn:hover{background:var(--surface-2);}
+.avatar{display:flex;align-items:center;gap:var(--sp-2);padding:4px 10px 4px 4px;border-radius:var(--r-full);cursor:pointer;transition:background var(--dur-1);}
+.avatar:hover{background:var(--surface-2);}
+.avatar .a-img{width:28px;height:28px;border-radius:var(--r-full);background:linear-gradient(135deg,var(--viz-2),var(--accent));}
+.avatar span{font-size:14px;font-weight:500;}
+
+/* 侧边栏 */
+.side{grid-area:side; background:var(--material-chrome); backdrop-filter:var(--material-blur); -webkit-backdrop-filter:var(--material-blur);
+  border-right:1px solid var(--separator); padding:var(--sp-3); overflow:auto;}
+.nav-section-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-tertiary);
+  margin:var(--sp-4) var(--sp-3) var(--sp-1);}
+.nav-item{display:flex;align-items:center;gap:var(--sp-2);padding:9px 12px;border-radius:var(--r-sm);
+  font-size:15px;font-weight:500;color:var(--text-secondary);cursor:pointer;text-decoration:none;
+  transition:background var(--dur-1) var(--ease-standard),color var(--dur-1);}
+.nav-item .ico{width:18px;text-align:center;font-size:15px;}
+.nav-item:hover{background:var(--surface-2);}
+.nav-item.active{background:var(--accent-soft);color:var(--accent-ink);font-weight:600;}
+.nav-child{padding-left:34px;font-size:14px;}
+
+/* 内容区 */
+.content{grid-area:content; overflow:auto; padding:var(--sp-6) var(--sp-8);}
+.page{width:100%;display:flex;flex-direction:column;gap:var(--sp-5);}
+.page-header h2{margin:0;font-size:28px;line-height:34px;font-weight:700;letter-spacing:-.02em;}
+.page-subtitle{margin:6px 0 0;font-size:13px;color:var(--text-secondary);}
+
+/* ============ L3 下划线页签（§10.1） ============ */
+.l3-tabs{position:relative;display:flex;gap:var(--sp-5);border-bottom:1px solid var(--separator);}
+.l3-tab{position:relative;padding:10px 2px;font-size:15px;font-weight:500;color:var(--text-secondary);cursor:pointer;
+  background:0;border:0;font-family:inherit;transition:color var(--dur-1) var(--ease-standard);}
+.l3-tab:hover{color:var(--text);}
+.l3-tab.active{color:var(--text);font-weight:600;}
+.l3-ink{position:absolute;bottom:-1px;height:2px;background:var(--accent);border-radius:2px;
+  transition:left var(--dur-2) var(--ease-standard),width var(--dur-2) var(--ease-standard);}
+
+/* ============ 汇总卡（§11.4） ============ */
+.summary-card{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--elev-1);padding:var(--sp-5);}
+.summary-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-4);}
+.summary-card-title{flex:1;margin:0 var(--sp-4) 0 0;font-size:20px;font-weight:650;letter-spacing:-.01em;color:var(--text);}
+.summary-metrics{display:grid;gap:var(--sp-3);grid-template-columns:repeat(auto-fit,minmax(150px,1fr));}
+.summary-metric{background:var(--surface-2);border-radius:var(--r-md);padding:var(--sp-4);}
+.summary-metric span{display:block;font-size:13px;color:var(--text-secondary);margin-bottom:var(--sp-1);}
+.summary-metric strong{font-size:22px;color:var(--text);font-variant-numeric:tabular-nums;}
+
+/* ============ 组织树 · Master–Detail（方案 A） ============ */
+.org-layout{display:grid;grid-template-columns:320px 1fr;gap:var(--sp-5);align-items:start;
+  transition:grid-template-columns var(--dur-3) var(--ease-standard);}
+.org-layout.collapsed{grid-template-columns:0 1fr;}
+.tree-panel{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--elev-1);overflow:hidden;min-width:0;}
+.tree-head{padding:var(--sp-3);border-bottom:1px solid var(--separator);}
+.tree-search{display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;background:var(--surface-2);
+  border-radius:var(--r-sm);box-shadow:0 0 0 1px var(--border) inset;transition:box-shadow var(--dur-1) var(--ease-standard);}
+.tree-search:focus-within{box-shadow:0 0 0 4px var(--accent-soft),0 0 0 1px var(--accent) inset;}
+.tree-search input{border:0;background:0;outline:0;font:inherit;font-size:13px;color:var(--text);width:100%;}
+.tree-body{padding:var(--sp-2);max-height:560px;overflow:auto;}
+.tree-node{display:flex;align-items:center;gap:6px;height:40px;padding-right:10px;border-radius:var(--r-sm);
+  cursor:pointer;position:relative;transition:background var(--dur-1) var(--ease-standard);}
+.tree-node:hover{background:var(--surface-2);}
+.tree-node.selected{background:var(--accent-soft);}
+.tree-node.selected::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:3px;border-radius:2px;background:var(--accent);}
+.tree-node .chevron{width:20px;text-align:center;color:var(--text-tertiary);font-size:10px;flex:none;
+  transition:transform var(--dur-2) var(--ease-standard);}
+.tree-node.open>.chevron{transform:rotate(90deg);}
+.tree-node .leaf{width:20px;flex:none;}
+.tree-node .nm{flex:1;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tree-node.selected .nm{font-weight:600;color:var(--accent-ink);}
+.tree-node .badge{font-size:12px;font-weight:600;color:var(--text-tertiary);font-variant-numeric:tabular-nums;
+  background:var(--surface-2);padding:1px 8px;border-radius:var(--r-full);}
+.tree-node:hover .badge{background:var(--bg);}
+.tree-node.selected .badge{background:rgba(0,122,255,.16);color:var(--accent-ink);}
+.tree-children{display:grid;grid-template-rows:0fr;transition:grid-template-rows var(--dur-3) var(--ease-standard);}
+.tree-children.open{grid-template-rows:1fr;}
+.tree-children>.inner{overflow:hidden;min-height:0;}
+mark{background:var(--warning-soft);color:inherit;border-radius:3px;padding:0 1px;}
+.breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);flex-wrap:wrap;}
+.breadcrumb a{color:var(--text-secondary);cursor:pointer;transition:color var(--dur-1);}
+.breadcrumb a:hover{color:var(--accent-ink);}
+.breadcrumb .sep{color:var(--text-tertiary);}
+.breadcrumb .cur{color:var(--text);font-weight:600;}
+
+/* ============ 组织作查询条件 · 树形下拉（§12.1） ============ */
+.org-filter{position:relative;}
+.org-filter-trigger{display:flex;align-items:center;gap:8px;height:36px;min-width:180px;padding:0 10px;
+  background:var(--surface-2);border-radius:var(--r-sm);box-shadow:0 0 0 1px var(--border) inset;cursor:pointer;
+  font-size:14px;color:var(--text);transition:box-shadow var(--dur-1) var(--ease-standard);}
+.org-filter-trigger:hover{box-shadow:0 0 0 1px var(--border-strong) inset;}
+.org-filter.open .org-filter-trigger{box-shadow:0 0 0 4px var(--accent-soft),0 0 0 1px var(--accent) inset;}
+.org-filter-trigger .val{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.org-filter-trigger .val.ph{color:var(--text-tertiary);}
+.org-filter-trigger .sub{font-size:11px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);padding:1px 7px;border-radius:var(--r-full);}
+.org-filter-trigger .clr{color:var(--text-tertiary);cursor:pointer;font-size:12px;}
+.org-filter-trigger .clr:hover{color:var(--text);}
+.org-filter-trigger .cv{color:var(--text-tertiary);font-size:10px;transition:transform var(--dur-2) var(--ease-standard);}
+.org-filter.open .cv{transform:rotate(180deg);}
+.org-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:40;width:280px;background:var(--surface);
+  border-radius:var(--r-lg);box-shadow:var(--elev-2);overflow:hidden;display:none;
+  animation:pop-in var(--dur-2) var(--ease-standard);}
+.org-filter.open .org-pop{display:block;}
+@keyframes pop-in{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+.org-pop-search{padding:var(--sp-3);border-bottom:1px solid var(--separator);}
+.op-tree{max-height:280px;overflow:auto;padding:var(--sp-2);}
+.org-pop-foot{display:flex;align-items:center;justify-content:space-between;padding:10px var(--sp-3);border-top:1px solid var(--separator);
+  font-size:13px;color:var(--text-secondary);}
+.switch{width:38px;height:22px;border-radius:var(--r-full);background:var(--border-strong);position:relative;flex:none;cursor:pointer;
+  transition:background var(--dur-2) var(--ease-standard);}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:var(--elev-1);
+  transition:transform var(--dur-2) var(--ease-spring);}
+.switch.on{background:var(--accent);}
+.switch.on::after{transform:translateX(16px);}
+
+/* ============ 消息提示 · Toast / 通知（§19） ============ */
+.toast-wrap{position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:80;
+  display:flex;flex-direction:column;gap:12px;align-items:center;pointer-events:none;}
+.toast{display:flex;align-items:center;gap:10px;max-width:min(90vw,480px);padding:9px 14px;
+  background:var(--surface);box-shadow:var(--elev-2);border-radius:var(--r-full);font-size:14px;color:var(--text);
+  pointer-events:auto;animation:toast-in var(--dur-3) var(--ease-spring);}
+.toast.out{animation:toast-out var(--dur-2) var(--ease-standard) forwards;}
+.toast .ic{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;flex:none;}
+.toast.success .ic{background:var(--success-soft);color:var(--success-ink);}
+.toast.info .ic{background:var(--info-soft);color:var(--info-ink);}
+.toast.warning .ic{background:var(--warning-soft);color:var(--warning-ink);}
+.toast.error .ic{background:var(--danger-soft);color:var(--danger-ink);}
+.toast .tx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.toast .tc{margin-left:2px;color:var(--text-tertiary);cursor:pointer;font-size:13px;}
+.toast .tc:hover{color:var(--text);}
+@keyframes toast-in{from{opacity:0;transform:translateY(-16px) scale(.96);}to{opacity:1;transform:none;}}
+@keyframes toast-out{to{opacity:0;transform:translateY(-8px);}}
+
+.notify-wrap{position:fixed;top:24px;right:24px;z-index:80;display:flex;flex-direction:column;gap:12px;width:360px;max-width:90vw;}
+.notify{display:flex;gap:12px;padding:14px 16px;background:var(--surface);box-shadow:var(--elev-3);border-radius:var(--r-lg);
+  animation:notify-in var(--dur-3) var(--ease-spring);}
+.notify.out{animation:notify-out var(--dur-2) var(--ease-standard) forwards;}
+.notify .ic{width:32px;height:32px;border-radius:var(--r-md);display:grid;place-items:center;font-size:15px;flex:none;
+  background:var(--accent-soft);color:var(--accent-ink);}
+.notify .bd{flex:1;min-width:0;}
+.notify .ti{font-size:15px;font-weight:600;margin-bottom:2px;}
+.notify .bo{font-size:13px;color:var(--text-secondary);}
+.notify .act{margin-top:8px;}
+.notify .nc{color:var(--text-tertiary);cursor:pointer;font-size:13px;}
+.notify .nc:hover{color:var(--text);}
+@keyframes notify-in{from{opacity:0;transform:translateX(24px) scale(.98);}to{opacity:1;transform:none;}}
+@keyframes notify-out{to{opacity:0;transform:translateX(24px);}}
+
+/* 操作列「更多」菜单（§13.3） */
+.ops-more{color:var(--text-secondary);font-weight:700;letter-spacing:1px;}
+.ops-menu-pop{position:fixed;z-index:90;min-width:140px;background:var(--surface);box-shadow:var(--elev-2);
+  border-radius:var(--r-md);padding:6px;display:flex;flex-direction:column;gap:2px;
+  animation:pop-in var(--dur-1) var(--ease-standard);}
+.ops-menu-item{border:0;background:none;text-align:left;cursor:pointer;padding:7px 10px;border-radius:var(--r-xs);
+  font-size:13px;color:var(--text);white-space:nowrap;transition:background var(--dur-1) var(--ease-standard);}
+.ops-menu-item:hover{background:var(--surface-2);}
+.ops-menu-item.danger{color:var(--danger-ink);}
+
+/* ============ 活力升级：Bento / Hero / 质感 / 微动 ============ */
+/* 背景微渐变（不再纯灰） */
+.content{background:
+  radial-gradient(1100px 520px at 12% -8%, rgba(10,132,255,.07), transparent 60%),
+  radial-gradient(900px 460px at 100% 0%, rgba(94,92,230,.05), transparent 55%),
+  var(--bg);}
+
+/* Bento 便当栅格 */
+.bento{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:minmax(112px,auto);gap:var(--sp-4);}
+.bento-card{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--elev-1);padding:var(--sp-5);
+  position:relative;overflow:hidden;animation:bento-in var(--dur-3) var(--ease-spring) both;
+  transition:transform var(--dur-2) var(--ease-out),box-shadow var(--dur-2) var(--ease-out);}
+.bento-card:hover{transform:translateY(-3px);box-shadow:var(--elev-2);}
+@keyframes bento-in{from{opacity:0;transform:translateY(14px) scale(.96);}to{opacity:1;transform:none;}}
+
+/* Hero 卡：accent 渐变实底 + 流光 */
+.hero{grid-column:span 2;grid-row:span 2;color:#fff;display:flex;flex-direction:column;justify-content:space-between;
+  background:linear-gradient(135deg,var(--accent) 0%,#0A6FE0 52%,#5E5CE6 100%);box-shadow:0 16px 40px -12px rgba(10,132,255,.5);}
+.hero:hover{box-shadow:0 22px 52px -12px rgba(10,132,255,.6);}
+.hero .h-top{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;opacity:.92;}
+.hero .h-num{font-size:52px;line-height:1;font-weight:700;letter-spacing:-.02em;margin:6px 0 10px;}
+.hero .delta.up,.hero .delta.down{background:rgba(255,255,255,.18);color:#fff;}
+.hero-sheen{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(115deg,transparent 32%,rgba(255,255,255,.20) 48%,transparent 64%);
+  transform:translateX(-70%);animation:sheen 6.5s ease-in-out infinite;}
+@keyframes sheen{0%,100%{transform:translateX(-70%);}50%{transform:translateX(70%);}}
+
+/* 呼吸脉冲点（活跃/实时） */
+.pulse{width:8px;height:8px;border-radius:50%;background:currentColor;position:relative;flex:none;}
+.pulse::after{content:"";position:absolute;inset:0;border-radius:50%;background:currentColor;animation:pulse 2.2s ease-out infinite;}
+@keyframes pulse{0%{transform:scale(1);opacity:.6;}100%{transform:scale(3.2);opacity:0;}}
+
+/* 指标块（Bento 内）：渐变图标 squircle + delta */
+.mtile{display:flex;flex-direction:column;justify-content:space-between;gap:var(--sp-3);}
+.mtile .m-ico{width:44px;height:44px;border-radius:var(--r-md);display:grid;place-items:center;color:#fff;flex:none;}
+.mtile .m-ico svg{width:22px;height:22px;stroke:#fff;}
+.mtile .m-ico:hover{animation:ico-pop var(--dur-3) var(--ease-spring);}
+@keyframes ico-pop{0%{transform:scale(1);}40%{transform:scale(1.16) rotate(-6deg);}100%{transform:scale(1);}}
+.mtile .m-label{font-size:13px;color:var(--text-secondary);}
+.mtile .m-num{font-size:26px;font-weight:700;letter-spacing:-.01em;}
+.g-blue {background:linear-gradient(135deg,#3AA0FF,#0A6FE0);box-shadow:0 8px 18px -6px rgba(10,132,255,.55);}
+.g-amber{background:linear-gradient(135deg,#FFC24B,#FF8A00);box-shadow:0 8px 18px -6px rgba(255,149,0,.5);}
+.g-green{background:linear-gradient(135deg,#5FE08A,#22A745);box-shadow:0 8px 18px -6px rgba(52,199,89,.5);}
+.g-teal {background:linear-gradient(135deg,#4EE6D0,#12B3A4);box-shadow:0 8px 18px -6px rgba(20,184,166,.5);}
+.g-violet{background:linear-gradient(135deg,#9B8CFF,#6C5CE7);box-shadow:0 8px 18px -6px rgba(108,92,231,.5);}
+
+/* 趋势 delta 徽标 */
+.delta{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:var(--r-full);width:fit-content;}
+.delta.up{color:var(--success-ink);background:var(--success-soft);}
+.delta.down{color:var(--danger-ink);background:var(--danger-soft);}
+
+/* 环形占比 */
+.ring-card{display:flex;align-items:center;gap:var(--sp-4);}
+.ring{--p:0;width:104px;height:104px;border-radius:50%;flex:none;display:grid;place-items:center;position:relative;
+  background:conic-gradient(var(--accent) calc(var(--p)*1%),var(--surface-2) 0);
+  transition:background var(--dur-1) linear;}
+.ring::before{content:"";position:absolute;inset:11px;border-radius:50%;background:var(--surface);}
+.ring .rv{position:relative;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;}
+
+/* 活动列表卡 */
+.act-card{grid-column:span 2;}
+.act-row{display:flex;align-items:center;gap:var(--sp-3);padding:9px 0;border-bottom:1px solid var(--separator);font-size:13px;}
+.act-row:last-child{border-bottom:0;}
+.act-dot{width:8px;height:8px;border-radius:50%;flex:none;}
+.act-row .who{font-weight:600;color:var(--text);}
+.act-row .when{margin-left:auto;color:var(--text-tertiary);font-variant-numeric:tabular-nums;}
+
+/* 侧栏 SVG 图标 */
+.nav-item .ico{display:grid;place-items:center;}
+.nav-item .ico svg{width:18px;height:18px;display:block;}
+
+/* 指标卡（用户列表页）渐变图标 + delta */
+.metric-icon svg{width:22px;height:22px;stroke:#fff;}
+.metric-body{display:flex;flex-direction:column;align-items:flex-start;}
+.metric-body .delta{margin-top:5px;}
+.metric-card:hover .metric-icon{animation:ico-pop var(--dur-3) var(--ease-spring);}
+
+.bento-card.wide{grid-column:span 2;}
+/* 断点阶 §4.1：平板档 < 1180 降 2 列、Hero 与宽卡跨满；窄屏档 < 768 降 1 列（§11.6） */
+@media (width < 1180px){ .bento{grid-template-columns:repeat(2,1fr);} .hero{grid-column:span 2;} .act-card,.bento-card.wide{grid-column:span 2;} }
+@media (width < 768px){ .bento{grid-template-columns:1fr;} .hero,.act-card,.bento-card.wide{grid-column:span 1;} }
+
+/* ============ 指标卡（§11.5） ============ */
+.metrics{display:grid;gap:var(--sp-4);grid-template-columns:repeat(auto-fit,minmax(210px,1fr));}
+.metric-card{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--elev-1);padding:var(--sp-5);
+  display:flex;align-items:center;gap:var(--sp-4);transition:transform var(--dur-1) var(--ease-standard),box-shadow var(--dur-1);}
+.metric-card:hover{transform:translateY(-2px);box-shadow:var(--elev-2);}
+.metric-icon{width:44px;height:44px;border-radius:var(--r-md);display:grid;place-items:center;font-size:20px;flex:none;}
+.mi-1{color:var(--viz-1);background:var(--accent-soft);}
+.mi-3{color:var(--viz-3);background:var(--warning-soft);}
+.mi-4{color:var(--viz-4);background:var(--success-soft);}
+.mi-2{color:var(--viz-2);background:rgba(20,184,166,.12);}
+.metric-body p{margin:0 0 4px;font-size:13px;color:var(--text-secondary);}
+.metric-body strong{font-size:24px;font-weight:700;letter-spacing:-.01em;}
+
+/* ============ 筛选栏（§12） ============ */
+.filter-bar{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;padding:var(--sp-3) var(--sp-4);
+  background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--elev-1);}
+.search-field{display:flex;align-items:center;gap:var(--sp-2);min-width:240px;height:36px;padding:0 var(--sp-3);
+  background:var(--surface-2);border-radius:var(--r-sm);box-shadow:0 0 0 1px var(--border) inset;
+  transition:box-shadow var(--dur-1) var(--ease-standard);}
+.search-field:focus-within{box-shadow:0 0 0 4px var(--accent-soft),0 0 0 1px var(--accent) inset;}
+.search-field input{border:0;background:transparent;outline:0;font:inherit;font-size:14px;color:var(--text);width:100%;}
+.search-field input::placeholder{color:var(--text-tertiary);}
+.filter-pill{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 6px 0 12px;border:0;
+  border-radius:var(--r-full);background:var(--accent-soft);color:var(--accent-ink);font:inherit;font-size:13px;font-weight:500;cursor:default;
+  animation:pill-in var(--dur-2) var(--ease-spring);}
+.filter-pill .x{width:18px;height:18px;border-radius:var(--r-full);display:grid;place-items:center;cursor:pointer;font-size:11px;
+  transition:background var(--dur-1);}
+.filter-pill .x:hover{background:rgba(0,122,255,.18);}
+@keyframes pill-in{from{transform:scale(.6);opacity:0;}to{transform:scale(1);opacity:1;}}
+/* 查询卡：条件区 + 操作区（§12 职责边界：查询卡只放条件，查询/重置恒右对齐） */
+.filter-conditions{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;flex:1;min-width:0;}
+.filter-actions{display:flex;align-items:center;gap:var(--sp-2);margin-left:auto;}
+.filter-field{display:flex;align-items:center;gap:var(--sp-2);height:36px;padding:0 var(--sp-3);min-width:200px;
+  background:var(--surface-2);border-radius:var(--r-sm);box-shadow:0 0 0 1px var(--border) inset;
+  color:var(--text);font-size:14px;cursor:pointer;transition:box-shadow var(--dur-1) var(--ease-standard);}
+.filter-field:hover{box-shadow:0 0 0 1px var(--border-strong) inset;}
+.filter-field .ff-ic{color:var(--text-tertiary);flex:none;}
+
+/* 按钮（§14） */
+.btn{min-height:36px;border-radius:var(--r-sm);font:inherit;font-weight:600;white-space:nowrap;padding:0 16px;border:0;cursor:pointer;
+  transition:transform var(--dur-1) var(--ease-standard),box-shadow var(--dur-1),background var(--dur-1),filter var(--dur-1);}
+.btn:hover{transform:translateY(-1px);}
+.btn:active{transform:scale(.97);}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;box-shadow:0 0 0 4px var(--accent-soft);}
+.btn-primary{background:var(--accent);color:var(--accent-contrast);}
+.btn-primary:hover{background:var(--accent-hover);}
+.btn-primary:active{background:var(--accent-pressed);}
+.btn-default{background:var(--surface);color:var(--text);box-shadow:0 0 0 1px var(--border) inset;}
+.btn-default:hover{background:var(--surface-2);}
+.btn-danger{background:var(--danger);color:var(--danger-contrast);}
+.btn-ghost{background:transparent;color:var(--text-secondary);}
+.btn-ghost:hover{background:var(--surface-2);}
+.btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;}
+.btn:disabled:hover{transform:none;}
+
+/* 键盘轮廓与柔光分层（§21）；复合输入在可见容器呈现轮廓。 */
+:where(button,a,input,select,textarea,[tabindex]):focus-visible,
+:where(.search-field,.tree-search,.org-filter-trigger):has(:focus-visible){
+  outline:2px solid var(--accent);outline-offset:2px;
+}
+.semantic-demo{padding:var(--sp-5);display:grid;gap:var(--sp-3);}
+.semantic-demo h3{margin:0;font-size:17px;}
+.semantic-demo p{margin:0;color:var(--text-secondary);font-size:13px;}
+.semantic-row{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;}
+.semantic-row code{min-width:110px;font-size:13px;}
+.semantic-fill{background:var(--demo-fill);color:var(--demo-contrast);}
+.semantic-soft{padding:var(--sp-2) var(--sp-3);border-radius:var(--r-xs);background:var(--demo-soft);color:var(--demo-ink);font-size:13px;}
+
+/* ============ 数据操作组（§12.2：内嵌数据卡片头，不再独立成卡） ============ */
+.action-primary,.action-io{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;}
+.action-io{margin-left:auto;}
+.action-selected{display:inline-flex;align-items:center;height:30px;padding:0 12px;margin-left:4px;border-radius:var(--r-full);
+  background:var(--accent-soft);color:var(--accent-ink);font-size:13px;font-weight:600;animation:pill-in var(--dur-2) var(--ease-spring);}
+.action-selected b{margin:0 3px;font-variant-numeric:tabular-nums;}
+
+/* ============ 数据卡片 + 表格（§11.2 / §13） ============ */
+.data-card{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--elev-1);overflow:hidden;}
+/* 卡片头（§11.2.1）：数据名标题+计数（左）+ 数据操作（action-primary 左 / action-io 右） */
+.data-card-header{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;min-height:52px;
+  padding:var(--sp-3) var(--sp-5);border-bottom:1px solid var(--separator);}
+.data-card-header .dch-title{font-size:15px;font-weight:650;color:var(--text);}
+.data-card-header .dch-title .dch-count{margin-left:var(--sp-2);color:var(--text-secondary);font-size:13px;font-weight:500;}
+.data-card-header .dch-extra{margin-left:auto;display:inline-flex;align-items:center;gap:var(--sp-2);}
+.section-title{font-size:17px;font-weight:600;padding:var(--sp-4) var(--sp-5) var(--sp-3);}
+table{width:100%;border-collapse:collapse;}
+thead th{position:sticky;top:0;background:var(--surface-2);text-align:left;font-size:13px;font-weight:600;color:var(--text-secondary);
+  height:48px;padding:0 var(--sp-5);border-bottom:1px solid var(--separator);z-index:1;}
+thead th.num{text-align:right;}
+tbody td{height:56px;padding:0 var(--sp-5);font-size:14px;border-bottom:1px solid var(--separator);color:var(--text);}
+tbody td.num{text-align:right;}
+tbody tr{transition:background var(--dur-1) var(--ease-standard);}
+tbody tr:hover{background:var(--bg);}
+tbody tr.enter{animation:row-in var(--dur-3) var(--ease-out) both;}
+@keyframes row-in{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+.tag{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 10px;border-radius:var(--r-full);font-size:12px;font-weight:600;}
+.tag.ok{background:var(--success-soft);color:var(--success-ink);}
+.tag.warn{background:var(--warning-soft);color:var(--warning-ink);}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+/* 行多选复选框（§12.2 卡片头批量按钮联动） */
+th.sel,td.sel{width:44px;padding-left:var(--sp-4);padding-right:0;}
+.chk{position:relative;display:inline-grid;place-items:center;width:18px;height:18px;cursor:pointer;}
+.chk input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;}
+.chk span{width:18px;height:18px;border-radius:6px;box-shadow:0 0 0 1px var(--border-strong) inset;background:var(--surface);
+  display:grid;place-items:center;transition:background var(--dur-1) var(--ease-standard),box-shadow var(--dur-1);}
+.chk span::after{content:"";width:11px;height:11px;opacity:0;transform:scale(.5);transition:all var(--dur-1) var(--ease-spring);
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5L20 6'/%3E%3C/svg%3E") center/contain no-repeat;}
+.chk input:checked+span,.chk input:indeterminate+span{background:var(--accent);box-shadow:0 0 0 1px var(--accent) inset;}
+.chk input:checked+span::after{opacity:1;transform:scale(1);}
+.chk input:indeterminate+span::after{opacity:1;transform:none;width:10px;height:2px;border-radius:1px;background:#fff;}
+tbody tr.sel-on,tbody tr.sel-on:hover{background:var(--accent-soft);}
+.link-btn{border:0;background:transparent;font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:4px 6px;border-radius:6px;
+  color:var(--text-secondary);transition:color var(--dur-1),background var(--dur-1);}
+tr:hover .link-btn{color:var(--accent-ink);}
+.link-btn.danger{}
+tr:hover .link-btn.danger{color:var(--danger-ink);}
+.link-btn:hover{background:var(--surface-2);}
+
+/* 骨架屏（§13.2） */
+.skeleton-row{height:56px;border-bottom:1px solid var(--separator);display:flex;align-items:center;padding:0 var(--sp-5);gap:var(--sp-4);}
+.sk{height:12px;border-radius:6px;background:linear-gradient(90deg,var(--surface-2) 25%,var(--bg) 37%,var(--surface-2) 63%);
+  background-size:400% 100%;animation:shimmer var(--dur-4) linear infinite;}
+@keyframes shimmer{from{background-position:100% 0;}to{background-position:-100% 0;}}
+
+/* 分页（§17） */
+.pagination{display:flex;align-items:center;justify-content:flex-end;gap:6px;padding:var(--sp-3) var(--sp-5);
+  background:var(--surface-2);border-top:1px solid var(--separator);font-size:13px;color:var(--text-secondary);}
+.pg{min-width:30px;height:30px;border:0;border-radius:8px;background:transparent;color:var(--text-secondary);font:inherit;font-weight:600;cursor:pointer;
+  transition:all var(--dur-1);}
+.pg:hover{background:var(--surface);}
+.pg.on{background:var(--accent);color:var(--accent-contrast);}
+
+/* 空状态（§18.1） */
+.empty-state{padding:48px 20px;text-align:center;color:var(--text-tertiary);font-size:15px;animation:fade var(--dur-3) var(--ease-out);}
+@keyframes fade{from{opacity:0;}to{opacity:1;}}
+
+/* 加载失败（§18.3）：与加载中 / 已加载三态互斥；不留旧行、计数不显示数字、分页不可操作 */
+.load-error{padding:48px 20px;display:flex;flex-direction:column;align-items:center;gap:var(--sp-3);text-align:center;
+  color:var(--text-secondary);font-size:15px;animation:fade var(--dur-3) var(--ease-out);}
+.load-error p{margin:0;}
+.load-error-icon{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:16px;font-weight:700;
+  background:var(--danger-soft);color:var(--danger-ink);}
+.pagination.is-disabled{opacity:.5;pointer-events:none;}
+
+/* 跳到主要内容 ＋ 换页焦点复位（§21） */
+.skip-link{position:fixed;left:var(--sp-3);top:-60px;z-index:100;padding:8px 14px;border-radius:var(--r-sm);
+  background:var(--surface);color:var(--text);font-weight:600;text-decoration:none;box-shadow:var(--elev-2);transition:top var(--dur-1);}
+.skip-link:focus{top:var(--sp-3);outline:2px solid var(--accent);outline-offset:2px;box-shadow:var(--elev-2),0 0 0 4px var(--accent-soft);}
+#focus-top,#main-content:focus{outline:none;}
+
+/* 弹窗（§16） */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.28);backdrop-filter:blur(4px);display:grid;place-items:center;z-index:50;
+  animation:fade var(--dur-2) var(--ease-standard);}
+.dialog{width:520px;max-width:92vw;background:var(--surface);border-radius:var(--r-xl);box-shadow:var(--elev-3);overflow:hidden;
+  animation:dialog-in var(--dur-3) var(--ease-spring);}
+@keyframes dialog-in{from{transform:scale(.96);opacity:0;}to{transform:scale(1);opacity:1;}}
+.dialog-h{padding:18px 24px 14px;border-bottom:1px solid var(--separator);font-size:20px;font-weight:650;letter-spacing:-.01em;}
+.dialog-b{padding:20px 24px;display:flex;flex-direction:column;gap:var(--sp-4);}
+.dialog-f{padding:14px 24px 18px;border-top:1px solid var(--separator);display:flex;justify-content:flex-end;gap:var(--sp-3);}
+.dialog-b{max-height:70vh;overflow:auto;}                       /* §16.1 弹窗内容超高内滚，页眉页脚吸附 */
+.dlg-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-4);}
+.dlg-table-scroll{max-height:240px;overflow:auto;}             /* §16.3 弹窗内表格固定表头（sticky thead 吸附此容器顶） */
+.field-label{font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;display:block;}
+.field{width:100%;min-height:36px;border-radius:var(--r-sm);background:var(--surface);border:0;font:inherit;font-size:14px;color:var(--text);
+  padding:0 12px;box-shadow:0 0 0 1px var(--border) inset;transition:box-shadow var(--dur-1) var(--ease-standard);}
+.field:hover{box-shadow:0 0 0 1px var(--border-strong) inset;}
+.field:focus{outline:2px solid var(--accent);outline-offset:2px;box-shadow:0 0 0 1px var(--accent) inset,0 0 0 4px var(--accent-soft);}
+select.field{cursor:pointer;}
+
+/* ============ 工作台账 · 看板（Kanban） ============ */
+.kanban-toolbar{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;}
+.kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-4);align-items:start;}
+.kb-col{background:var(--bg-soft);border-radius:var(--r-lg);border:1px solid var(--separator);
+  display:flex;flex-direction:column;min-height:220px;
+  transition:background var(--dur-1) var(--ease-standard),box-shadow var(--dur-1);}
+.kb-col.drop{background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent) inset;}
+.kb-col-head{display:flex;align-items:center;gap:8px;padding:12px 14px 10px;}
+.kb-col-head .bar{width:8px;height:8px;border-radius:2px;flex:none;}
+.kb-col-head .t{font-size:14px;font-weight:650;color:var(--text);}
+.kb-col-head .cnt{margin-left:auto;font-size:12px;font-weight:600;color:var(--text-tertiary);
+  background:var(--surface);border-radius:var(--r-full);padding:1px 9px;font-variant-numeric:tabular-nums;}
+.kb-body{display:flex;flex-direction:column;gap:10px;padding:0 12px 12px;min-height:60px;flex:1;overflow:auto;max-height:66vh;}
+.kb-empty{color:var(--text-tertiary);font-size:13px;text-align:center;padding:24px 8px;}
+
+.kb-card{background:var(--surface);border:1px solid var(--separator);border-radius:var(--r-xs);box-shadow:var(--elev-1);
+  padding:12px 13px;cursor:grab;animation:bento-in var(--dur-3) var(--ease-spring) both;
+  transition:transform var(--dur-1) var(--ease-out),box-shadow var(--dur-1);}
+.kb-card:hover{transform:translateY(-2px);box-shadow:var(--elev-2);}
+.kb-card.dragging{opacity:.45;cursor:grabbing;}
+.kb-top{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.kb-pri{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text-secondary);}
+.kb-pri .d{width:7px;height:7px;border-radius:50%;flex:none;}
+.kb-overdue{margin-left:auto;font-size:11px;font-weight:600;color:var(--danger-ink);background:var(--danger-soft);
+  border-radius:var(--r-full);padding:1px 8px;}
+.kb-title{font-size:14px;font-weight:600;color:var(--text);line-height:1.35;margin-bottom:9px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.kb-meta{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-secondary);margin-bottom:7px;}
+.kb-ava{width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,var(--viz-2),var(--accent));
+  color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center;flex:none;}
+.kb-date{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);margin-bottom:9px;font-variant-numeric:tabular-nums;}
+.kb-date .od{color:var(--danger-ink);font-weight:600;}
+.kb-prog{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;margin-bottom:7px;}
+.kb-prog i{display:block;height:100%;border-radius:3px;background:var(--accent);transition:width var(--dur-3) var(--ease-out);}
+.kb-foot{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--text-tertiary);font-variant-numeric:tabular-nums;}
+.kb-foot .pct{font-weight:700;color:var(--accent-ink);}
+@media (width < 1180px){ .kanban{grid-template-columns:repeat(2,1fr);} }
+@media (width < 768px){ .kanban{grid-template-columns:1fr;} }
+
+/* 台账详情抽屉 */
+.drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.28);backdrop-filter:blur(3px);z-index:60;display:none;}
+.drawer-overlay.open{display:block;animation:fade var(--dur-2) var(--ease-standard);}
+.drawer{position:fixed;top:0;right:0;height:100%;width:420px;max-width:92vw;background:var(--surface);
+  box-shadow:var(--elev-3);z-index:61;display:flex;flex-direction:column;
+  transform:translateX(100%);transition:transform var(--dur-3) var(--ease-out);}
+.drawer.open{transform:none;}
+.drawer-head{padding:20px 20px 14px;border-bottom:1px solid var(--separator);position:relative;}
+.drawer-close{position:absolute;top:14px;right:14px;width:32px;height:32px;border:0;background:transparent;
+  border-radius:var(--r-full);color:var(--text-tertiary);cursor:pointer;font-size:15px;transition:background var(--dur-1);}
+.drawer-close:hover{background:var(--surface-2);color:var(--text);}
+.drawer-body{padding:16px 20px;overflow:auto;flex:1;}
+.drawer .sub-item{padding:11px 0;border-bottom:1px solid var(--separator);}
+.drawer .sub-item:last-child{border-bottom:0;}
+
+/* ============ 透明灵动：玻璃质感表面 ============ */
+:root{ --surface-glass:color-mix(in srgb, var(--surface) 74%, transparent); }
+.data-card,.metric-card,.summary-card,.filter-bar,.tree-panel,.kb-card,.bento-card:not(.hero){
+  background:var(--surface-glass);
+  -webkit-backdrop-filter:saturate(185%) blur(18px); backdrop-filter:saturate(185%) blur(18px);
+  border-top-color:rgba(255,255,255,.55);   /* 玻璃顶部亮边 */
+}
+.drawer,.dialog,.org-pop,.ops-menu-pop,.notify,.toast{
+  background:var(--surface-glass);
+  -webkit-backdrop-filter:saturate(190%) blur(24px); backdrop-filter:saturate(190%) blur(24px);
+  border-top:1px solid rgba(255,255,255,.5);
+}
+/* 看板列更通透 */
+.kb-col{background:color-mix(in srgb, var(--bg-soft) 55%, transparent);
+  -webkit-backdrop-filter:saturate(160%) blur(10px); backdrop-filter:saturate(160%) blur(10px);}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  :root{ --surface-glass:var(--surface); }   /* 不支持 backdrop-filter 时回退不透明 */
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important;animation-iteration-count:1!important;}
+}
+</style>
+</head>
+<body>
+<div id="focus-top" tabindex="-1"></div>
+<a class="skip-link" href="#main-content">跳到主要内容</a>
+<div class="app">
+  <!-- 顶栏 -->
+  <header class="chrome">
+    <div class="brand">产品名</div>
+    <span class="app-ver">v1.0</span>
+    <div class="chrome-spacer"></div>
+    <div class="seg" id="themeSeg">
+      <button data-theme="system" class="on">跟随系统</button>
+      <button data-theme="light">亮</button>
+      <button data-theme="dark">暗</button>
+    </div>
+    <button class="icon-btn" title="消息">🔔</button>
+    <div class="avatar"><div class="a-img"></div><span>管理员</span></div>
+  </header>
+
+  <!-- 侧边栏 -->
+  <nav class="side">
+    <a class="nav-item active" data-view="dash"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg></span> 仪表盘</a>
+    <div class="nav-section-label">台账管理</div>
+    <a class="nav-item" data-view="kanban"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1.4"/><rect x="9.5" y="4" width="5" height="11" rx="1.4"/><rect x="16" y="4" width="5" height="14" rx="1.4"/></svg></span> 台账看板</a>
+    <div class="nav-section-label">个人</div>
+    <a class="nav-item nav-child">我的任务</a>
+    <a class="nav-item nav-child">我的关注</a>
+    <a class="nav-item nav-child">最近访问</a>
+    <div class="nav-section-label">组织管理</div>
+    <a class="nav-item" data-view="org"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="4.5" rx="1.2"/><rect x="3" y="15.5" width="6" height="4.5" rx="1.2"/><rect x="15" y="15.5" width="6" height="4.5" rx="1.2"/><path d="M12 7.5v3.5M6 15.5v-2h12v2M12 11v2"/></svg></span> 组织架构</a>
+    <a class="nav-item" data-view="users"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.6a3 3 0 0 1 0 5.6M20.5 20a5.5 5.5 0 0 0-3.4-5.1"/></svg></span> 台账列表</a>
+    <a class="nav-item"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M18 5l2 2M15.5 7.5l2 2"/></svg></span> 成员管理</a>
+    <div class="nav-section-label">系统</div>
+    <a class="nav-item"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2.5 12h3M18.5 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></span> 系统配置</a>
+  </nav>
+
+  <!-- 内容区 -->
+  <main class="content" id="main-content" tabindex="-1">
+    <!-- ============ 仪表盘（Bento · Hero · 活力示范） ============ -->
+    <section class="page" id="view-dash">
+      <div class="page-header">
+        <h2>仪表盘</h2>
+        <p class="page-subtitle">Bento 便当布局 · Hero 焦点 · 渐变质感 · 趋势 delta · 持续微动</p>
+      </div>
+      <div class="bento">
+        <!-- Hero -->
+        <div class="bento-card hero" style="animation-delay:0ms">
+          <div class="h-top"><span class="pulse"></span> 进行中事项总数</div>
+          <div>
+            <div class="h-num tnum" data-count="1284">0</div>
+            <span class="delta up">▲ 12 项 · 较上周</span>
+          </div>
+          <div class="hero-sheen"></div>
+        </div>
+        <!-- 指标 tiles -->
+        <div class="bento-card mtile" style="animation-delay:60ms">
+          <div class="m-ico g-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2.2"/><path d="M9.5 3.5v2.5M14.5 3.5v2.5M9.5 18v2.5M14.5 18v2.5M3.5 9.5h2.5M3.5 14.5h2.5M18 9.5h2.5M18 14.5h2.5"/></svg></div>
+          <div><div class="m-label">台账总数</div><div class="m-num tnum" data-count="3860">0</div></div>
+          <span class="delta up">▲ 8.1%</span>
+        </div>
+        <div class="bento-card mtile" style="animation-delay:110ms">
+          <div class="m-ico g-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5v19M16 6.8C16 5.1 14.2 4 12 4S8 5 8 6.9s1.9 2.6 4 3 4 1.3 4 3.3-1.8 3.3-4 3.3-4-1.2-4-2.9"/></svg></div>
+          <div><div class="m-label">逾期事项</div><div class="m-num tnum" data-count="27">0</div></div>
+          <span class="delta down">▼ 3 项</span>
+        </div>
+        <div class="bento-card mtile" style="animation-delay:160ms">
+          <div class="m-ico g-teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.6a3 3 0 0 1 0 5.6M20.5 20a5.5 5.5 0 0 0-3.4-5.1"/></svg></div>
+          <div><div class="m-label" style="display:flex;align-items:center;gap:6px;color:var(--success-ink)"><span class="pulse" style="width:7px;height:7px"></span><span style="color:var(--text-secondary)">活跃组织</span></div><div class="m-num tnum" data-count="342">0</div></div>
+          <span class="delta up">▲ 5.6%</span>
+        </div>
+        <div class="bento-card mtile" style="animation-delay:210ms">
+          <div class="m-ico g-violet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5 7 5-14 2.5 7h4"/></svg></div>
+          <div><div class="m-label">本周完成</div><div class="m-num tnum">156</div></div>
+          <span class="delta up">▲ 18 项</span>
+        </div>
+        <!-- 环形占比 -->
+        <div class="bento-card ring-card wide" style="animation-delay:260ms">
+          <div class="ring" data-p="68"><span class="rv tnum">0%</span></div>
+          <div>
+            <div class="m-label">整体完成率</div>
+            <div class="m-num tnum">412 / 606 项</div>
+            <span class="delta up" style="margin-top:8px">▲ 完成率 68%</span>
+          </div>
+        </div>
+        <!-- 最近活动 -->
+        <div class="bento-card act-card" style="animation-delay:310ms">
+          <div class="section-title" style="padding:0 0 8px">最近活动</div>
+          <div class="act-row"><span class="act-dot" style="background:var(--success)"></span><span class="who">张伟</span>&nbsp;新建了台账&nbsp;<span class="when">2 分钟前</span></div>
+          <div class="act-row"><span class="act-dot" style="background:var(--accent)"></span><span class="who">李娜</span>&nbsp;更新了进展&nbsp;<span class="when">18 分钟前</span></div>
+          <div class="act-row"><span class="act-dot" style="background:var(--warning)"></span><span class="who">王强</span>&nbsp;子任务逾期预警&nbsp;<span class="when">1 小时前</span></div>
+          <div class="act-row"><span class="act-dot" style="background:var(--danger)"></span><span class="who">陈静</span>&nbsp;归档了台账&nbsp;<span class="when">3 小时前</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 工作台账 · 看板 ============ -->
+    <section class="page" id="view-kanban" style="display:none">
+      <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-4);">
+        <div>
+          <h2>工作台账</h2>
+          <p class="page-subtitle">Trello 式看板 · 按状态分列 · 拖动卡片改状态 · 点击看子项</p>
+        </div>
+        <button class="btn btn-primary">+ 新建台账</button>
+      </div>
+      <div class="kanban-toolbar">
+        <div class="search-field" style="min-width:260px;max-width:300px"><span style="color:var(--text-tertiary)">⌕</span><input id="kbSearch" placeholder="搜索台账…"></div>
+      </div>
+      <div class="kanban" id="kanban"></div>
+    </section>
+
+    <section class="page" id="view-users" style="display:none">
+      <div class="page-header">
+        <h2>台账列表</h2>
+        <p class="page-subtitle">展示 UI 设计规范的材质、层次、动效、组件样式，以及 L3 下划线页签</p>
+      </div>
+
+      <!-- L3 下划线页签（§10.1）：切换子视图 -->
+      <nav class="l3-tabs" id="l3tabs" role="tablist">
+        <button class="l3-tab active">全部</button>
+        <button class="l3-tab">进行中</button>
+        <button class="l3-tab">已完成</button>
+        <button class="l3-tab">已逾期</button>
+        <span class="l3-ink"></span>
+      </nav>
+
+      <!-- 指标卡 -->
+      <div class="metrics">
+        <div class="metric-card"><div class="metric-icon g-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5 7 5-14 2.5 7h4"/></svg></div><div class="metric-body"><p>台账总数</p><strong class="tnum" data-count="3860">0</strong><span class="delta up">▲ 12.4%</span></div></div>
+        <div class="metric-card"><div class="metric-icon g-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2.2"/><path d="M9.5 3.5v2.5M14.5 3.5v2.5M9.5 18v2.5M14.5 18v2.5M3.5 9.5h2.5M3.5 14.5h2.5M18 9.5h2.5M18 14.5h2.5"/></svg></div><div class="metric-body"><p>进行中</p><strong class="tnum" data-count="1284">0</strong><span class="delta up">▲ 8.1%</span></div></div>
+        <div class="metric-card"><div class="metric-icon g-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5v19M16 6.8C16 5.1 14.2 4 12 4S8 5 8 6.9s1.9 2.6 4 3 4 1.3 4 3.3-1.8 3.3-4 3.3-4-1.2-4-2.9"/></svg></div><div class="metric-body"><p>已完成</p><strong class="tnum" data-count="2549">0</strong><span class="delta up">▲ 6.2%</span></div></div>
+        <div class="metric-card"><div class="metric-icon g-teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/><path d="M16 5.6a3 3 0 0 1 0 5.6M20.5 20a5.5 5.5 0 0 0-3.4-5.1"/></svg></div><div class="metric-body"><p>逾期</p><strong class="tnum" data-count="27">0</strong><span class="delta down">▼ 3 项</span></div></div>
+      </div>
+
+      <!-- 查询卡（§12：纯查询条件；≤4 高频平铺 + 高级筛选收纳；查询/重置恒右对齐） -->
+      <div class="filter-bar">
+        <div class="filter-conditions">
+          <div class="search-field" style="min-width:230px;max-width:250px">
+            <span style="color:var(--text-tertiary)">⌕</span>
+            <input placeholder="搜索台账名称 / 负责人…（⌘F）" />
+          </div>
+
+          <!-- 组织作查询条件（§12.1）：树形下拉 + 含下级开关 -->
+          <div class="org-filter" id="orgFilter">
+            <div class="org-filter-trigger">
+              <span class="val ph">全部组织</span>
+              <span class="sub" style="display:none">含下级</span>
+              <span class="clr" style="display:none">✕</span>
+              <span class="cv">▾</span>
+            </div>
+            <div class="org-pop">
+              <div class="org-pop-search">
+                <div class="tree-search"><span style="color:var(--text-tertiary)">⌕</span><input placeholder="搜索组织…"></div>
+              </div>
+              <div class="op-tree"></div>
+              <div class="org-pop-foot"><span>含下级组织</span><span class="switch on"></span></div>
+            </div>
+          </div>
+
+          <!-- 日期区间（高频条件之一） -->
+          <div class="filter-field">
+            <svg class="ff-ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/></svg>
+            <span>2026-06-16 ~ 07-15</span>
+            <span style="margin-left:auto;color:var(--text-tertiary)">▾</span>
+          </div>
+
+          <div class="seg" id="statusSeg">
+            <button class="on">全部</button><button>进行中</button><button>已完成</button>
+          </div>
+
+          <!-- 第 5 个起收进高级筛选（§12），选中回填 pill -->
+          <button class="btn btn-ghost" id="addPill">高级筛选 ▾</button>
+          <div id="pills"></div>
+        </div>
+
+        <div class="filter-actions">
+          <button class="btn btn-primary">查询</button>
+          <button class="btn btn-default">重置</button>
+        </div>
+      </div>
+
+      <!-- 数据卡片（§11.2.1：卡片头 = 数据名+计数 + 数据操作内嵌；左=新增/批量、右=导入导出。导入现无能力故不渲染） -->
+      <div class="data-card">
+        <div class="data-card-header">
+          <div class="dch-title">台账列表<span class="dch-count" id="listCount">共 96 条</span></div>
+          <div class="action-primary">
+            <button class="btn btn-primary">＋ 新增</button>
+            <button class="btn btn-default" id="batchEdit" disabled>批量编辑</button>
+            <button class="btn btn-danger" id="batchDel" disabled>批量删除</button>
+            <span class="action-selected" id="selInfo" style="display:none">已选 <b id="selNum">0</b> 项</span>
+          </div>
+          <div class="action-io">
+            <button class="btn btn-default">导出</button>
+          </div>
+        </div>
+        <div id="tableWrap"></div>
+        <div class="pagination" id="listPager">
+          <span class="tnum" id="pagerTotal">共 96 条</span>
+          <div style="flex:1"></div>
+          <button class="pg">‹</button>
+          <button class="pg on">1</button><button class="pg">2</button><button class="pg">3</button>
+          <button class="pg">›</button>
+        </div>
+      </div>
+
+      <!-- 按钮 & 弹窗触发 -->
+      <div class="data-card" style="padding:var(--sp-5);display:flex;gap:var(--sp-3);flex-wrap:wrap;align-items:center;">
+        <span style="font-size:13px;color:var(--text-secondary);margin-right:8px;">组件示例：</span>
+        <button class="btn btn-primary" id="openDialog">打开弹窗</button>
+        <button class="btn btn-default">次要操作</button>
+        <button class="btn btn-danger">危险操作</button>
+        <button class="btn btn-ghost">幽灵按钮</button>
+        <input class="field" style="width:200px" placeholder="输入框（聚焦看绽放）" />
+        <button class="btn btn-default" id="reloadTable">重载表格（看骨架屏）</button>
+        <button class="btn btn-default" id="failTable">模拟加载失败（看失败态）</button>
+        <span style="width:1px;height:24px;background:var(--separator)"></span>
+        <span style="font-size:13px;color:var(--text-secondary);">消息提示：</span>
+        <button class="btn btn-default" data-toast="success">成功</button>
+        <button class="btn btn-default" data-toast="info">信息</button>
+        <button class="btn btn-default" data-toast="warning">警告</button>
+        <button class="btn btn-default" data-toast="error">错误</button>
+        <button class="btn btn-default" id="btnNotify">通知卡片</button>
+      </div>
+      <!-- §2.1–2.2：填充字与微染字分层，随顶栏亮 / 暗 / 系统切换。 -->
+      <section class="data-card semantic-demo" aria-label="语义颜色令牌示例">
+        <h3>语义色 · 四层令牌</h3>
+        <p>填充使用 contrast 文字，微染底使用 ink 文字。切换顶栏主题查看亮暗；Tab 查看实线聚焦轮廓。强调按钮另演示悬停 / 按下两档。</p>
+        <div class="semantic-row" data-semantic="accent" style="--demo-fill:var(--accent);--demo-contrast:var(--accent-contrast);--demo-soft:var(--accent-soft);--demo-ink:var(--accent-ink)">
+          <code>--accent</code><button class="btn semantic-fill">强调 · 填充 / contrast</button><span class="semantic-soft">强调 · soft / ink</span>
+        </div>
+        <div class="semantic-row" data-semantic="success" style="--demo-fill:var(--success);--demo-contrast:var(--success-contrast);--demo-soft:var(--success-soft);--demo-ink:var(--success-ink)">
+          <code>--success</code><button class="btn semantic-fill">成功 · 填充 / contrast</button><span class="semantic-soft">成功 · soft / ink</span>
+        </div>
+        <div class="semantic-row" data-semantic="warning" style="--demo-fill:var(--warning);--demo-contrast:var(--warning-contrast);--demo-soft:var(--warning-soft);--demo-ink:var(--warning-ink)">
+          <code>--warning</code><button class="btn semantic-fill">提醒 · 填充 / contrast</button><span class="semantic-soft">提醒 · soft / ink</span>
+        </div>
+        <div class="semantic-row" data-semantic="danger" style="--demo-fill:var(--danger);--demo-contrast:var(--danger-contrast);--demo-soft:var(--danger-soft);--demo-ink:var(--danger-ink)">
+          <code>--danger</code><button class="btn semantic-fill">危险 · 填充 / contrast</button><span class="semantic-soft">危险 · soft / ink</span>
+        </div>
+        <div class="semantic-row" data-semantic="info" style="--demo-fill:var(--info);--demo-contrast:var(--info-contrast);--demo-soft:var(--info-soft);--demo-ink:var(--info-ink)">
+          <code>--info</code><button class="btn semantic-fill">信息 · 填充 / contrast</button><span class="semantic-soft">信息 · soft / ink</span>
+        </div>
+        <div class="semantic-row"><button class="btn btn-primary">强调 · 悬停 / 按下</button></div>
+      </section>
+    </section>
+
+    <!-- ============ 组织架构页（方案 A：Master–Detail） ============ -->
+    <section class="page" id="view-org">
+      <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-4);">
+        <div>
+          <h2>组织架构</h2>
+          <p class="page-subtitle">方案 A · 双栏 Master–Detail：左树常驻 + 右详情（面包屑 + 当前组织概览 + 直接下级）</p>
+        </div>
+        <button class="btn btn-default" id="treeToggle">收起树</button>
+      </div>
+
+      <div class="org-layout" id="orgLayout">
+        <!-- 左：组织树 -->
+        <aside class="tree-panel">
+          <div class="tree-head">
+            <div class="tree-search"><span style="color:var(--text-tertiary)">⌕</span><input id="treeSearch" placeholder="搜索组织…"></div>
+          </div>
+          <div class="tree-body" id="treeBody"></div>
+        </aside>
+        <!-- 右：详情 -->
+        <div style="display:flex;flex-direction:column;gap:var(--sp-5);min-width:0;">
+          <div class="breadcrumb" id="breadcrumb"></div>
+          <section class="summary-card">
+            <div class="summary-card-header">
+              <h3 class="summary-card-title" id="orgName">当前组织：—</h3>
+              <button class="btn btn-primary">查看台账明细</button>
+            </div>
+            <div class="summary-metrics" id="orgMetrics"></div>
+          </section>
+          <div class="data-card">
+            <div class="data-card-header">
+              <div class="dch-title">直接下级组织<span class="dch-count">共 6 个</span></div>
+              <div class="action-primary">
+                <button class="btn btn-primary">＋ 新增下级</button>
+              </div>
+            </div>
+            <div id="orgChildrenTable"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- 消息提示容器（§19） -->
+<div class="toast-wrap" id="toastWrap"></div>
+<div class="notify-wrap" id="notifyWrap"></div>
+
+<!-- 台账详情抽屉 -->
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head"><button class="drawer-close" id="drawerClose">✕</button></div>
+  <div class="drawer-body"></div>
+</aside>
+
+<script>
+/* 主题切换 */
+const root=document.documentElement;
+document.querySelectorAll('#themeSeg button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#themeSeg button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); root.setAttribute('data-theme',b.dataset.theme);
+});
+/* 分段控件 */
+document.querySelectorAll('#statusSeg button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#statusSeg button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+});
+
+/* count-up */
+function countUp(el){
+  const target=+el.dataset.count, dur=800, prefix=el.dataset.prefix||'', fmt=el.dataset.format;
+  const t0=performance.now();
+  function fmtNum(v){
+    if(fmt==='compact'){ if(v>=1e6)return (v/1e6).toFixed(1)+'M'; if(v>=1e3)return (v/1e3).toFixed(1)+'K'; }
+    return Math.round(v).toLocaleString();
+  }
+  function step(t){ const p=Math.min(1,(t-t0)/dur); const e=1-Math.pow(1-p,3);
+    el.textContent=prefix+fmtNum(target*e); if(p<1)requestAnimationFrame(step); }
+  requestAnimationFrame(step);
+}
+document.querySelectorAll('[data-count]').forEach(countUp);
+
+/* filter pill 增删 */
+const pillNames=['部门: 研发部','时间: 近7天','优先级: 高','状态: 进行中'];
+let pi=0; const pillsEl=document.getElementById('pills');
+document.getElementById('addPill').onclick=()=>{
+  const name=pillNames[pi++%pillNames.length];
+  const p=document.createElement('button'); p.className='filter-pill';
+  p.innerHTML=name+' <span class="x">✕</span>';
+  p.querySelector('.x').onclick=()=>{p.style.animation='pill-in var(--dur-2) var(--ease-spring) reverse';setTimeout(()=>p.remove(),160);};
+  pillsEl.appendChild(p);
+};
+
+/* 表格：骨架屏 -> 逐行进场 */
+const rows=[
+  ['季度 OKR 制定与部门对齐','张伟','研发部','5/8','62%','进行中'],
+  ['客户满意度调研问卷回收','李娜','市场部','3/7','45%','进行中'],
+  ['新版官网首页改版上线','王强','研发部','0/6','0%','已逾期'],
+  ['年度供应商资质复审','赵敏','采购部','2/4','20%','进行中'],
+  ['Q2 财务结算与报表归档','陈静','财务部','9/9','100%','已完成'],
+  ['员工年度体检组织安排','刘洋','行政部','5/5','100%','已完成'],
+];
+function skeleton(){
+  const w=document.getElementById('tableWrap');
+  w.innerHTML='';
+  for(let i=0;i<6;i++){
+    const r=document.createElement('div'); r.className='skeleton-row';
+    r.innerHTML='<div class="sk" style="width:14%"></div><div class="sk" style="width:20%"></div><div class="sk" style="width:12%"></div><div class="sk" style="flex:1"></div><div class="sk" style="width:10%"></div>';
+    w.appendChild(r);
+  }
+}
+function renderTable(){
+  const w=document.getElementById('tableWrap');
+  let html='<table><thead><tr><th class="sel"><label class="chk"><input type="checkbox" id="selAll"><span></span></label></th><th>台账名称</th><th>负责人</th><th>归属部门</th><th class="num">子任务</th><th class="num">进展</th><th>状态</th><th style="width:200px">操作</th></tr></thead><tbody>';
+  rows.forEach((r,i)=>{
+    const tag=r[5]==='已逾期'?'<span class="tag warn"><span class="dot"></span>已逾期</span>':'<span class="tag ok"><span class="dot"></span>'+r[5]+'</span>';
+    html+=`<tr class="enter" style="animation-delay:${i*30}ms"><td class="sel"><label class="chk"><input type="checkbox" class="rowsel"><span></span></label></td><td>${r[0]}</td><td class="tnum">${r[1]}</td><td>${r[2]}</td><td class="num tnum">${r[3]}</td><td class="num tnum">${r[4]}</td><td>${tag}</td><td style="white-space:nowrap"><button class="link-btn">查看</button><button class="link-btn">编辑</button><button class="link-btn danger">删除</button><button class="link-btn ops-more" data-more>⋯</button></td></tr>`;
+  });
+  html+='</tbody></table>';
+  w.innerHTML=html;
+  setupRowSelect();
+  w.querySelectorAll('.ops-more').forEach(btn=>{
+    btn.setAttribute('aria-haspopup','menu'); btn.setAttribute('aria-expanded','false'); btn.setAttribute('aria-label','更多操作');
+    btn.onmouseenter=()=>{clearTimeout(opsHideTimer);openOpsMenu(btn);};
+    btn.onmouseleave=scheduleOpsClose;
+    /* 键盘可达（§13.3）：Enter / 空格 / ↓ 打开并聚焦首项；悬停不是唯一的打开方式 */
+    btn.onclick=()=>{openOpsMenu(btn,true);};
+    btn.onkeydown=e=>{ if(e.key==='ArrowDown'){e.preventDefault();openOpsMenu(btn,true);} };
+  });
+}
+/* 操作列「更多」悬停菜单：用 fixed 定位，避免被 .data-card(overflow:hidden) 裁切 */
+let opsMenuEl=null, opsHideTimer=null;
+let opsMenuBtn=null;
+function openOpsMenu(btn,byKeyboard){
+  closeOpsMenu();
+  const m=document.createElement('div'); m.className='ops-menu-pop'; m.setAttribute('role','menu');
+  m.innerHTML='<button class="ops-menu-item" role="menuitem">查看进展</button><button class="ops-menu-item" role="menuitem">导出台账</button><button class="ops-menu-item danger" role="menuitem">归档</button>';
+  document.body.appendChild(m);
+  const r=btn.getBoundingClientRect();
+  /* 不被裁切（§13.3）：挂在 body 上 fixed 定位；下方空间不够时向上展开 */
+  const below=r.bottom+6, h=m.offsetHeight;
+  m.style.top=(below+h>innerHeight-8 ? Math.max(8,r.top-6-h) : below)+'px';
+  m.style.left=Math.max(8,r.right-m.offsetWidth)+'px';
+  m.onmouseenter=()=>clearTimeout(opsHideTimer);
+  m.onmouseleave=scheduleOpsClose;
+  const items=[...m.querySelectorAll('.ops-menu-item')];
+  items.forEach(i=>i.onclick=()=>{closeOpsMenu();btn.focus();});
+  m.onkeydown=e=>{
+    const k=items.indexOf(document.activeElement);
+    if(e.key==='ArrowDown'){e.preventDefault();items[(k+1)%items.length].focus();}
+    else if(e.key==='ArrowUp'){e.preventDefault();items[(k-1+items.length)%items.length].focus();}
+    else if(e.key==='Escape'){e.preventDefault();closeOpsMenu();btn.focus();}
+    else if(e.key==='Tab'){closeOpsMenu();}
+  };
+  btn.setAttribute('aria-expanded','true');
+  opsMenuEl=m; opsMenuBtn=btn;
+  if(byKeyboard) items[0].focus();
+}
+/* 行多选 ↔ 卡片头批量按钮联动（§12.2） */
+function setupRowSelect(){
+  const all=document.getElementById('selAll');
+  const rs=[...document.querySelectorAll('#tableWrap .rowsel')];
+  if(!all) return;
+  function update(){
+    const n=rs.filter(x=>x.checked).length;
+    rs.forEach(x=>x.closest('tr').classList.toggle('sel-on',x.checked));
+    all.checked = n>0 && n===rs.length;
+    all.indeterminate = n>0 && n<rs.length;
+    const info=document.getElementById('selInfo');
+    if(info){ document.getElementById('selNum').textContent=n; info.style.display=n?'inline-flex':'none'; }
+    const be=document.getElementById('batchEdit'), bd=document.getElementById('batchDel');
+    if(be) be.disabled=!n; if(bd) bd.disabled=!n;
+  }
+  all.onchange=()=>{ rs.forEach(x=>x.checked=all.checked); update(); };
+  rs.forEach(x=>x.onchange=update);
+  update();
+}
+function scheduleOpsClose(){ opsHideTimer=setTimeout(closeOpsMenu,140); }
+function closeOpsMenu(){ if(opsMenuEl){opsMenuEl.remove();opsMenuEl=null;} if(opsMenuBtn){opsMenuBtn.setAttribute('aria-expanded','false');opsMenuBtn=null;} clearTimeout(opsHideTimer); }
+addEventListener('scroll',closeOpsMenu,true);
+/* 三态互斥（§18.3）：加载中 / 加载失败 / 已加载，任一时刻只呈现一态 */
+function setListMeta(ok){
+  const c=document.getElementById('listCount'), p=document.getElementById('listPager');
+  c.textContent=ok?'共 96 条':'';                          /* 失败时不显示数字，不写「共 0 条」 */
+  c.style.display=ok?'':'none';
+  document.getElementById('pagerTotal').style.visibility=ok?'':'hidden';   /* 分页里的总数同理 */
+  p.classList.toggle('is-disabled',!ok); p.setAttribute('aria-disabled',String(!ok));
+}
+function renderLoadError(){
+  const w=document.getElementById('tableWrap');
+  w.innerHTML='<div class="load-error" role="alert"><span class="load-error-icon" aria-hidden="true">!</span>'
+    +'<p>请求未完成，请稍后重试</p><button type="button" class="btn btn-default" id="retryTable">重新加载</button></div>';
+  setListMeta(false);
+  document.getElementById('retryTable').onclick=loadTable;
+}
+function loadTable(){ skeleton(); setTimeout(()=>{ renderTable(); setListMeta(true); }, 900); }
+function loadTableFail(){ skeleton(); setTimeout(renderLoadError, 900); }  /* 不留旧行：先清掉再进失败态 */
+loadTable();
+document.getElementById('reloadTable').onclick=loadTable;
+document.getElementById('failTable').onclick=loadTableFail;
+
+/* 弹窗 */
+document.getElementById('openDialog').onclick=()=>{
+  const o=document.createElement('div'); o.className='overlay';
+  // 弹窗内数据卡片行（§16.3）：复用列表数据，展示"关联子任务"
+  const keyRows=rows.map(r=>{
+    const tag=r[5]==='已逾期'?'<span class="tag warn"><span class="dot"></span>已逾期</span>':'<span class="tag ok"><span class="dot"></span>'+r[5]+'</span>';
+    return `<tr><td>${r[0]}</td><td>${r[1]}</td><td class="num tnum">${r[4]}</td><td>${tag}</td></tr>`;
+  }).join('');
+  o.innerHTML=`<div class="dialog" style="width:760px">
+    <div class="dialog-h">编辑台账 · 季度 OKR 制定</div>
+    <div class="dialog-b">
+      <div class="dlg-form-grid">
+        <div><label class="field-label">台账名称</label><input class="field" value="季度 OKR 制定与部门对齐"></div>
+        <div><label class="field-label">负责人</label><select class="field"><option>张伟</option><option>李娜</option><option>王强</option></select></div>
+      </div>
+      <!-- 弹窗内数据卡片（§16.3：.data-card + 卡片头 + 固定表头滚动） -->
+      <div class="data-card">
+        <div class="data-card-header">
+          <div class="dch-title">关联子任务<span class="dch-count">共 ${rows.length} 条</span></div>
+          <div class="action-io"><button class="btn btn-default">导出</button></div>
+        </div>
+        <div class="dlg-table-scroll">
+          <table>
+            <thead><tr><th>子任务</th><th>负责人</th><th class="num">进展</th><th>状态</th></tr></thead>
+            <tbody>${keyRows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="dialog-f"><button class="btn btn-ghost" data-close>取消</button><button class="btn btn-primary" data-close>保存</button></div>
+  </div>`;
+  o.addEventListener('click',e=>{ if(e.target===o||e.target.hasAttribute('data-close')){ o.style.animation='fade var(--dur-2) reverse'; setTimeout(()=>o.remove(),160);} });
+  document.body.appendChild(o);
+};
+
+/* L3 下划线页签：滑动下划线 + 切换驱动内容 */
+const l3=document.getElementById('l3tabs');
+const ink=l3.querySelector('.l3-ink');
+const l3tabs=[...l3.querySelectorAll('.l3-tab')];
+function moveInk(tab){ ink.style.left=tab.offsetLeft+'px'; ink.style.width=tab.offsetWidth+'px'; }
+l3tabs.forEach(t=>t.onclick=()=>{
+  l3tabs.forEach(x=>x.classList.remove('active')); t.classList.add('active');
+  moveInk(t); loadTable();               /* 每个页签是独立子视图，切换即重载内容 */
+});
+addEventListener('load',()=>moveInk(l3.querySelector('.l3-tab.active')));
+moveInk(l3.querySelector('.l3-tab.active'));
+
+/* ============ 视图切换（侧边栏导航） ============ */
+function switchView(v){
+  document.getElementById('view-dash').style.display  = v==='dash'?'':'none';
+  document.getElementById('view-users').style.display = v==='users'?'':'none';
+  document.getElementById('view-org').style.display   = v==='org'?'':'none';
+  document.getElementById('view-kanban').style.display= v==='kanban'?'':'none';
+  if(v==='org' && !treeBuilt) initOrg();
+  if(v==='users') moveInk(l3.querySelector('.l3-tab.active'));   /* 隐藏态下 offset 为 0，切回时重定位 */
+  if(v==='dash') animateRings();
+  if(v==='kanban' && !kanbanBuilt){ kanbanBuilt=true; renderKanban(); }
+  /* 换页焦点复位（§21）：焦点回文档起点，下一次 Tab 落在「跳到主要内容」；页面滚回顶部 */
+  document.querySelector('.content').scrollTop=0;
+  document.getElementById('focus-top').focus({preventScroll:true});
+}
+function animateRings(){
+  document.querySelectorAll('#view-dash .ring').forEach(r=>{
+    if(r.dataset.done) return; r.dataset.done='1';
+    const target=+r.dataset.p, rv=r.querySelector('.rv'), t0=performance.now();
+    (function step(t){ const p=Math.min(1,(t-t0)/900), e=1-Math.pow(1-p,3), v=target*e;
+      r.style.setProperty('--p',v); rv.textContent=Math.round(v)+'%';
+      if(p<1)requestAnimationFrame(step); })(performance.now());
+  });
+}
+document.querySelectorAll('.nav-item').forEach(a=>a.onclick=()=>{
+  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  a.classList.add('active');
+  if(a.dataset.view) switchView(a.dataset.view);
+});
+
+/* ============ 组织树（方案 A） ============ */
+const ORG={name:'集团总部',users:1240,ledgers:386,cost:12,active:118,children:[
+  {name:'研发中心',users:320,ledgers:120,cost:5,active:42,children:[
+    {name:'前端组',users:48,ledgers:22,cost:1,active:8},
+    {name:'后端组',users:72,ledgers:35,cost:2,active:14},
+    {name:'测试组',users:40,ledgers:18,cost:0,active:6},
+  ]},
+  {name:'市场部',users:210,ledgers:66,cost:3,active:20,children:[
+    {name:'品牌组',users:60,ledgers:20,cost:1,active:7},
+    {name:'增长组',users:55,ledgers:24,cost:1,active:9},
+  ]},
+  {name:'产品部',users:150,ledgers:55,cost:2,active:18,children:[
+    {name:'交互组',users:30,ledgers:12,cost:0,active:5},
+    {name:'用户研究',users:26,ledgers:9,cost:1,active:4},
+  ]},
+  {name:'运营部',users:95,ledgers:38,cost:2,active:15},
+]};
+function fmtK(v){ if(v>=1e6)return (v/1e6).toFixed(1)+'M'; if(v>=1e3)return (v/1e3).toFixed(1)+'K'; return ''+v; }
+let treeBuilt=false, selectedNode=null;
+
+/* 预处理：挂 _parent，供面包屑回溯 */
+(function link(node,parent){ node._parent=parent||null; (node.children||[]).forEach(c=>link(c,node)); })(ORG);
+
+function highlight(name,f){ if(!f)return name; const i=name.toLowerCase().indexOf(f); if(i<0)return name;
+  return name.slice(0,i)+'<mark>'+name.slice(i,i+f.length)+'</mark>'+name.slice(i+f.length); }
+
+/* 递归构建节点；filter 时仅保留命中及其祖先，并自动展开 */
+function buildNode(node,depth,filter){
+  const kids=node.children||[];
+  const nameMatch=filter && node.name.toLowerCase().includes(filter);
+  const childEls=[]; let anyChildVisible=false;
+  kids.forEach(c=>{ const el=buildNode(c,depth+1,filter); if(el){ childEls.push(el); anyChildVisible=true; } });
+  if(filter && !nameMatch && !anyChildVisible) return null;
+
+  const wrap=document.createElement('div');
+  const row=document.createElement('div');
+  row.className='tree-node'; row.style.paddingLeft=(8+depth*18)+'px';
+  const hasKids=kids.length>0;
+  row.innerHTML=`<span class="${hasKids?'chevron':'leaf'}">${hasKids?'▶':''}</span>`
+    +`<span class="nm">${highlight(node.name,filter)}</span><span class="badge">${node.users}</span>`;
+  wrap.appendChild(row);
+
+  let childWrap=null;
+  if(hasKids){
+    childWrap=document.createElement('div'); childWrap.className='tree-children';
+    const inner=document.createElement('div'); inner.className='inner';
+    childEls.forEach(e=>inner.appendChild(e)); childWrap.appendChild(inner); wrap.appendChild(childWrap);
+    const openInit = filter ? anyChildVisible : depth===0;   /* 无筛选：仅根默认展开；筛选：命中分支自动展开 */
+    if(openInit){ childWrap.classList.add('open'); row.classList.add('open'); }
+  }
+  node._row=row;
+  row.onclick=e=>{
+    selectNode(node);
+    if(hasKids){ const open=childWrap.classList.toggle('open'); row.classList.toggle('open',open); }
+  };
+  return wrap;
+}
+
+function renderTree(filter){
+  const body=document.getElementById('treeBody'); body.innerHTML='';
+  const el=buildNode(ORG,0,filter); if(el)body.appendChild(el);
+  if(selectedNode && selectedNode._row) selectedNode._row.classList.add('selected');
+}
+
+function selectNode(node){
+  if(selectedNode && selectedNode._row) selectedNode._row.classList.remove('selected');
+  selectedNode=node; if(node._row)node._row.classList.add('selected');
+  // 面包屑
+  const path=[]; for(let n=node;n;n=n._parent)path.unshift(n);
+  document.getElementById('breadcrumb').innerHTML = path.map((n,i)=>
+    i===path.length-1 ? `<span class="cur">${n.name}</span>`
+                      : `<a data-node="${n.name}">${n.name}</a><span class="sep">›</span>`).join('');
+  document.querySelectorAll('#breadcrumb a').forEach(a=>a.onclick=()=>{
+    const t=findByName(ORG,a.dataset.node); if(t)selectNode(t);
+  });
+  // 概览
+  document.getElementById('orgName').textContent='当前组织：'+node.name;
+  const metrics=[['成员数',node.users],['台账数',fmtK(node.ledgers)],['逾期',node.cost],['进行中',node.active]];
+  document.getElementById('orgMetrics').innerHTML=metrics.map(m=>
+    `<div class="summary-metric"><span>${m[0]}</span><strong class="tnum">${m[1]}</strong></div>`).join('');
+  // 直接下级
+  renderChildren(node);
+}
+
+function findByName(node,name){ if(node.name===name)return node;
+  for(const c of (node.children||[])){ const r=findByName(c,name); if(r)return r; } return null; }
+
+function renderChildren(node){
+  const el=document.getElementById('orgChildrenTable'); const kids=node.children||[];
+  if(!kids.length){ el.innerHTML='<p class="empty-state">暂无下级组织</p>'; return; }
+  let html='<table><thead><tr><th>组织</th><th class="num">成员数</th><th class="num">台账数</th><th class="num">逾期</th><th class="num">进行中</th><th style="width:96px">操作</th></tr></thead><tbody>';
+  kids.forEach((c,i)=>{ html+=`<tr class="enter" style="animation-delay:${i*30}ms"><td>${c.name}</td>`
+    +`<td class="num tnum">${c.users}</td><td class="num tnum">${fmtK(c.ledgers)}</td>`
+    +`<td class="num tnum">${c.cost}</td><td class="num tnum">${c.active}</td>`
+    +`<td><button class="link-btn" data-go="${c.name}">进入</button></td></tr>`; });
+  el.innerHTML=html+'</tbody></table>';
+  el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{
+    const t=findByName(ORG,b.dataset.go);
+    if(t){ // 展开父节点后选中，模拟从表格下钻
+      if(node._row && !node._row.classList.contains('open')) node._row.click();
+      selectNode(t);
+    }
+  });
+}
+
+function initOrg(){
+  treeBuilt=true; renderTree(''); selectNode(ORG);
+  document.getElementById('treeSearch').oninput=e=>renderTree(e.target.value.trim().toLowerCase());
+  document.getElementById('treeToggle').onclick=function(){
+    const collapsed=document.getElementById('orgLayout').classList.toggle('collapsed');
+    this.textContent=collapsed?'展开树':'收起树';
+  };
+}
+
+/* 默认停在仪表盘（Bento 活力示范页） */
+switchView('dash');
+
+/* ============ 组织作查询条件 · 树形下拉（§12.1） ============ */
+(function(){
+  const wrap=document.getElementById('orgFilter');
+  const trigger=wrap.querySelector('.org-filter-trigger');
+  const val=wrap.querySelector('.val'), subBadge=wrap.querySelector('.sub'), clr=wrap.querySelector('.clr');
+  const treeEl=wrap.querySelector('.op-tree'), search=wrap.querySelector('.org-pop-search input'), sw=wrap.querySelector('.switch');
+  let current=null, includeChildren=true;
+
+  function opBuild(node,depth,filter){
+    const kids=node.children||[]; const nameMatch=filter&&node.name.toLowerCase().includes(filter);
+    const childEls=[]; let anyVis=false;
+    kids.forEach(c=>{const el=opBuild(c,depth+1,filter); if(el){childEls.push(el);anyVis=true;}});
+    if(filter&&!nameMatch&&!anyVis)return null;
+    const w=document.createElement('div'), row=document.createElement('div');
+    row.className='tree-node'+(current===node?' selected':''); row.style.paddingLeft=(8+depth*18)+'px';
+    const hasKids=kids.length>0;
+    row.innerHTML=`<span class="${hasKids?'chevron':'leaf'}">${hasKids?'▶':''}</span><span class="nm">${highlight(node.name,filter)}</span>`;
+    w.appendChild(row);
+    let cw=null;
+    if(hasKids){
+      cw=document.createElement('div'); cw.className='tree-children';
+      const inner=document.createElement('div'); inner.className='inner';
+      childEls.forEach(e=>inner.appendChild(e)); cw.appendChild(inner); w.appendChild(cw);
+      if(filter?anyVis:depth===0){cw.classList.add('open'); row.classList.add('open');}
+      row.querySelector('.chevron').onclick=e=>{e.stopPropagation(); const o=cw.classList.toggle('open'); row.classList.toggle('open',o);};
+    }
+    row.onclick=()=>selectOrg(node);
+    return w;
+  }
+  function opRender(filter){ treeEl.innerHTML=''; const el=opBuild(ORG,0,filter); if(el)treeEl.appendChild(el); }
+  function selectOrg(node){
+    current=node; val.textContent=node.name; val.classList.remove('ph');
+    clr.style.display=''; subBadge.style.display=includeChildren?'':'none'; close();
+  }
+  function clear(e){ e.stopPropagation(); current=null; val.textContent='全部组织'; val.classList.add('ph'); clr.style.display='none'; subBadge.style.display='none'; }
+  function open(){ wrap.classList.add('open'); opRender(''); search.value=''; setTimeout(()=>search.focus(),0); }
+  function close(){ wrap.classList.remove('open'); }
+  trigger.onclick=e=>{ if(e.target===clr)return; wrap.classList.contains('open')?close():open(); };
+  clr.onclick=clear;
+  search.oninput=e=>opRender(e.target.value.trim().toLowerCase());
+  sw.onclick=()=>{ includeChildren=sw.classList.toggle('on'); subBadge.style.display=(current&&includeChildren)?'':'none'; };
+  document.addEventListener('click',e=>{ if(!wrap.contains(e.target)) close(); });
+})();
+
+/* ============ 消息提示 · 统一封装（§19） ============ */
+const toastWrap=document.getElementById('toastWrap'), notifyWrap=document.getElementById('notifyWrap');
+const TOAST_ICON={success:'✓',info:'i',warning:'!',error:'✕'};
+const TOAST_DUR ={success:3000,info:3000,warning:4000,error:4500};
+function showToast(type,msg){
+  const el=document.createElement('div'); el.className='toast '+type; el.setAttribute('role',type==='error'?'alert':'status');
+  el.setAttribute('aria-live',type==='error'?'assertive':'polite');
+  el.innerHTML=`<span class="ic">${TOAST_ICON[type]}</span><span class="tx">${msg}</span>`;
+  let timer; const dismiss=()=>{ clearTimeout(timer); el.classList.add('out'); setTimeout(()=>el.remove(),200); };
+  if(type==='error'){ const c=document.createElement('span'); c.className='tc'; c.textContent='✕'; c.onclick=dismiss; el.appendChild(c); }
+  toastWrap.appendChild(el);
+  while(toastWrap.children.length>3) toastWrap.firstChild.remove();   /* 同屏 ≤3，替换最旧 */
+  timer=setTimeout(dismiss,TOAST_DUR[type]);                          /* error 也自动消失，但另带手动关闭 */
+}
+const notify={
+  success:m=>showToast('success',m), info:m=>showToast('info',m),
+  warn:m=>showToast('warning',m), error:m=>showToast('error',m),
+  push({title,body,action,persist}){
+    const el=document.createElement('div'); el.className='notify';
+    el.innerHTML=`<span class="ic">🔔</span><div class="bd"><div class="ti">${title}</div><div class="bo">${body}</div>`
+      +(action?`<div class="act"><button class="link-btn" style="padding:2px 0;color:var(--accent-ink)">${action}</button></div>`:'')
+      +`</div><span class="nc">✕</span>`;
+    let timer; const close=()=>{ clearTimeout(timer); el.classList.add('out'); setTimeout(()=>el.remove(),200); };
+    el.querySelector('.nc').onclick=close;
+    notifyWrap.appendChild(el);
+    if(!persist && !action) timer=setTimeout(close,4500);            /* 含操作则不自动消失 */
+  }
+};
+document.querySelectorAll('[data-toast]').forEach(b=>b.onclick=()=>{
+  const t=b.dataset.toast;
+  notify[{success:'success',info:'info',warning:'warn',error:'error'}[t]](
+    {success:'已保存',info:'同步已开始',warning:'部分数据未更新',error:'保存失败：网络连接超时'}[t]);
+});
+document.getElementById('btnNotify').onclick=()=>notify.push({
+  title:'导出完成', body:'「台账列表.xlsx」已生成，可下载查看。', action:'下载文件'});
+
+/* ============ 工作台账 · 看板 ============ */
+const KB_COLS=[
+  {key:'todo', label:'待启动', color:'#8A93A3'},
+  {key:'doing',label:'进行中', color:'var(--accent)'},
+  {key:'done', label:'已完成', color:'var(--success)'},
+  {key:'hold', label:'已搁置', color:'var(--warning)'},
+];
+const KB_PRI={high:{t:'高',c:'var(--danger)'},mid:{t:'中',c:'var(--warning)'},low:{t:'低',c:'#8A93A3'}};
+let LEDGERS=[
+  {id:1,title:'季度 OKR 制定与部门对齐',status:'doing',pri:'high',owner:'张伟',dept:'研发部',start:'06-10',end:'07-20',prog:62,done:5,total:8,remain:6,
+    sub:[{name:'一级目标梳理',prog:100},{name:'各组 KR 对齐会',prog:70},{name:'OKR 系统录入',prog:20}]},
+  {id:2,title:'客户满意度调研问卷回收与分析',status:'doing',pri:'mid',owner:'李娜',dept:'市场部',start:'05-28',end:'06-30',prog:45,done:3,total:7,remain:-3,
+    sub:[{name:'问卷设计',prog:100},{name:'渠道投放',prog:60},{name:'数据清洗',prog:10}]},
+  {id:3,title:'新版官网首页改版上线',status:'todo',pri:'high',owner:'王强',dept:'研发部',start:'07-15',end:'08-30',prog:0,done:0,total:6,remain:38,
+    sub:[{name:'视觉稿评审',prog:0},{name:'前端重构',prog:0}]},
+  {id:4,title:'年度供应商资质复审',status:'todo',pri:'low',owner:'赵敏',dept:'采购部',start:'07-10',end:'09-10',prog:0,done:0,total:4,remain:33,sub:[]},
+  {id:5,title:'Q2 财务结算与报表归档',status:'done',pri:'mid',owner:'陈静',dept:'财务部',start:'06-01',end:'07-05',prog:100,done:9,total:9,remain:0,
+    sub:[{name:'凭证核对',prog:100},{name:'报表生成',prog:100},{name:'归档入库',prog:100}]},
+  {id:6,title:'员工年度体检组织安排',status:'done',pri:'low',owner:'刘洋',dept:'行政部',start:'05-20',end:'06-18',prog:100,done:5,total:5,remain:0,sub:[]},
+  {id:7,title:'CRM 系统数据迁移（暂缓）',status:'hold',pri:'mid',owner:'孙磊',dept:'研发部',start:'06-05',end:'07-25',prog:35,done:2,total:6,remain:9,
+    sub:[{name:'数据字段映射',prog:80},{name:'迁移脚本',prog:20}]},
+  {id:8,title:'办公区域改造工程',status:'hold',pri:'low',owner:'周洁',dept:'行政部',start:'06-20',end:'08-20',prog:15,done:1,total:5,remain:22,sub:[]},
+];
+let kanbanBuilt=false, kbFilter='', kbDragId=null;
+const KB_STATUS_LABEL={todo:'待启动',doing:'进行中',done:'已完成',hold:'已搁置'};
+
+function kbCard(l,i){
+  const pri=KB_PRI[l.pri], overdue=l.remain<0 && l.status!=='done';
+  const remainTxt = l.status==='done' ? '已完成'
+    : overdue ? `逾期 ${-l.remain} 天` : `剩 ${l.remain} 天`;
+  return `<div class="kb-card" draggable="true" data-id="${l.id}" style="animation-delay:${i*40}ms">
+    <div class="kb-top">
+      <span class="kb-pri"><span class="d" style="background:${pri.c}"></span>${pri.t}优先级</span>
+      ${overdue?'<span class="kb-overdue">逾期</span>':''}
+    </div>
+    <div class="kb-title">${l.title}</div>
+    <div class="kb-meta"><span class="kb-ava">${l.owner[0]}</span>${l.owner} · ${l.dept}</div>
+    <div class="kb-date">🗓 ${l.start} → <span class="${overdue?'od':''}">${l.end}</span> · <span class="${overdue?'od':''}">${remainTxt}</span></div>
+    <div class="kb-prog"><i style="width:${l.prog}%"></i></div>
+    <div class="kb-foot"><span>✔ ${l.done}/${l.total} 子项</span><span class="pct">${l.prog}%</span></div>
+  </div>`;
+}
+function renderKanban(){
+  const wrap=document.getElementById('kanban'); wrap.innerHTML='';
+  KB_COLS.forEach(col=>{
+    const items=LEDGERS.filter(l=>l.status===col.key && (!kbFilter || l.title.toLowerCase().includes(kbFilter)));
+    const el=document.createElement('div'); el.className='kb-col'; el.dataset.col=col.key;
+    el.innerHTML=`<div class="kb-col-head"><span class="bar" style="background:${col.color}"></span>`
+      +`<span class="t">${col.label}</span><span class="cnt">${items.length}</span></div>`
+      +`<div class="kb-body">${items.length?items.map((l,i)=>kbCard(l,i)).join(''):'<div class="kb-empty">暂无台账</div>'}</div>`;
+    wrap.appendChild(el);
+  });
+  wireKanban();
+}
+function wireKanban(){
+  document.querySelectorAll('#kanban .kb-card').forEach(c=>{
+    c.addEventListener('dragstart',()=>{kbDragId=+c.dataset.id;c.classList.add('dragging');});
+    c.addEventListener('dragend',()=>{c.classList.remove('dragging');document.querySelectorAll('.kb-col').forEach(x=>x.classList.remove('drop'));});
+    c.addEventListener('click',()=>{ if(!c.classList.contains('dragging')) openKbDrawer(+c.dataset.id); });
+  });
+  document.querySelectorAll('#kanban .kb-col').forEach(col=>{
+    col.addEventListener('dragover',e=>{e.preventDefault();col.classList.add('drop');});
+    col.addEventListener('dragleave',e=>{ if(!col.contains(e.relatedTarget)) col.classList.remove('drop'); });
+    col.addEventListener('drop',e=>{e.preventDefault();col.classList.remove('drop');
+      const l=LEDGERS.find(x=>x.id===kbDragId); if(!l)return;
+      const ns=col.dataset.col;
+      if(l.status!==ns){
+        l.status=ns;
+        if(ns==='done'){ l.prog=100; l.done=l.total; l.remain=0; }
+        else if(ns==='todo'){ l.prog=0; l.done=0; }
+        renderKanban();
+        notify.success(`「${l.title.slice(0,10)}…」已移至${KB_STATUS_LABEL[ns]}`);
+      }
+    });
+  });
+}
+function openKbDrawer(id){
+  const l=LEDGERS.find(x=>x.id===id); if(!l)return;
+  const dw=document.getElementById('drawer');
+  dw.querySelector('.drawer-head').innerHTML=`<button class="drawer-close" id="drawerClose">✕</button>
+    <div style="font-size:20px;font-weight:650;letter-spacing:-.01em;padding-right:34px">${l.title}</div>
+    <div style="margin-top:10px;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary)">
+      <span class="kb-ava">${l.owner[0]}</span>${l.owner} · ${l.dept} · ${KB_STATUS_LABEL[l.status]}</div>`;
+  const subs=(l.sub||[]).map(s=>`<div class="sub-item">
+      <div style="display:flex;justify-content:space-between;margin-bottom:7px"><span style="font-weight:600">${s.name}</span>
+      <span class="tnum" style="color:var(--text-secondary)">${s.prog}%</span></div>
+      <div class="kb-prog"><i style="width:${s.prog}%"></i></div></div>`).join('');
+  dw.querySelector('.drawer-body').innerHTML=`
+    <div class="kb-date" style="margin-bottom:14px">🗓 ${l.start} → ${l.end}</div>
+    <div class="kb-prog" style="height:8px;margin-bottom:8px"><i style="width:${l.prog}%"></i></div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">总进度 <b style="color:var(--accent-ink)">${l.prog}%</b> · ${l.done}/${l.total} 子项完成</div>
+    <div class="section-title" style="padding:0 0 6px">子项</div>
+    ${subs||'<div class="kb-empty">该台账暂无子项</div>'}`;
+  dw.querySelector('#drawerClose').onclick=closeKbDrawer;
+  document.getElementById('drawerOverlay').classList.add('open'); dw.classList.add('open');
+}
+function closeKbDrawer(){ document.getElementById('drawerOverlay').classList.remove('open'); document.getElementById('drawer').classList.remove('open'); }
+document.getElementById('drawerOverlay').onclick=closeKbDrawer;
+document.getElementById('kbSearch').oninput=e=>{ kbFilter=e.target.value.trim().toLowerCase(); renderKanban(); };
+
+/* ⌘F 聚焦搜索 */
+addEventListener('keydown',e=>{ if((e.metaKey||e.ctrlKey)&&e.key==='f'){e.preventDefault();document.querySelector('.search-field input').focus();} });
+</script>
+</body>
+</html>
