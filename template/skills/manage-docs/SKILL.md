@@ -26,8 +26,8 @@ description: 整理项目文档、判断文档应归入 docs/prds、docs/designs
 `docs/` 下的一级目录**全部用复数**、**按文档类型分**；其中 **`prds` / `designs` / `tests` / `reviews` 四类再按版本建子目录**：
 
 ```text
-docs/prds/{版本号}/       需求文档（用户需求文档、用户需求规格说明书、需求变更）
-docs/designs/{版本号}/    系统设计文档（设计实现文档、开发文档、设计/开发变更）
+docs/prds/{版本号}/       需求文档（用户需求文档、用户需求规格说明书、需求说明、需求变更）
+docs/designs/{版本号}/    系统设计文档（系统设计与迭代规划、开发规格与计划即 spec + plan、设计/开发变更）
                           UI 形态不落本目录 —— 它的产物是 `prototypes/<版本>/` 下的 Web UI 原型
 docs/tests/{版本号}/      测试与验收文档（版本验收文档、功能清单、验收报告、验收测试变更）
 docs/reviews/{版本号}/    历史评审记录、原型交付说明
@@ -39,17 +39,17 @@ docs/infra/      工程基建（团队协作机制设计、基建能力的验证
 
 归类规则：
 
-- 需求类文档（用户需求文档、需求规格说明书）→ `docs/prds/{版本号}/`。
-- 系统设计与开发文档（设计实现文档、开发文档、技术方案）→ `docs/designs/{版本号}/`。
-  **UI 形态落 `prototypes/<版本>/` 下的原型，不落 `docs/`**；界面设计稿不再产出，既有的 `界面设计稿-*-r2.md` **冻结留存，不删、不改、不续写**。
+- 需求类文档（用户需求文档、需求规格说明书；增量链路的需求说明；快速链路的需求说明一般只落账本 note，必要时在 `docs/prds/` 写一节）→ `docs/prds/{版本号}/`。
+- 系统设计与开发文档（系统设计与迭代规划；每轮或增量链路的 spec + plan 一份，命名「开发规格与计划」）→ `docs/designs/{版本号}/`。
+  **UI 形态落 `prototypes/<版本>/` 下的原型，不落 `docs/`**；界面设计稿不再产出，既有的 `界面设计稿-*.md` **冻结留存，不删、不改、不续写**。
 - 测试与验收文档（测试设计、测试用例、测试报告、验收报告、功能清单）→ `docs/tests/{版本号}/`。
 - 历史评审记录、原型交付说明 → `docs/reviews/{版本号}/`；新评审结论只落账本。
 - 深度讨论洞见账本（思考过程/决策追溯，一议题一份，跨版本的活文档）→ `docs/insights/`，命名 `<议题slug>-洞见账本.md`（**不带版本前缀**，版本写在文件头部）。
-- 长期有效、跨版本复用的规范 → `docs/rules/`。
+- 长期有效、跨版本复用的规范 → `docs/rules/`；本工程的专属信息 `docs/rules/工程配置.md` 也在这里，不归 `docs/configs/`。
 - 外部系统、接口参数、部署环境、代理服务器等配置说明 → `docs/configs/`。
-- **工程基建**的产物（团队协作机制设计、账本 / 部署链 / hook 等基建能力的验证与经验记录）→ `docs/infra/`。**判据：读者是团队自己、而非产品**（基建范围见 `AGENTS.md` §二）。基建待办不落文件，以账本 `_infra` 版本为准。
+- **工程基建**的产物（团队协作机制设计、账本 / 部署链 / hook 等基建能力的验证与经验记录）→ `docs/infra/`。**判据：读者是团队自己、而非产品**（基建范围见 `AGENTS.md`「班子与两类工作」）。基建待办不落文件，以账本 `_infra` 版本为准。
 
-**代码不入 docs**：前端原型等代码工程放仓库对应目录，不放 `docs/` 下。
+**代码不入 docs**：前端原型等代码工程放仓库对应目录（见 `docs/rules/工程配置.md`「目录」），不放 `docs/` 下。
 
 ## 版本产物命名与落位
 
@@ -69,8 +69,8 @@ docs/{prds|designs|tests|reviews}/{版本号}/{文档类型}-{标识}.md
 
 | 目录 | `{文档类型}` |
 |------|--------------|
-| `docs/prds/{版本号}/` | 用户需求文档、用户需求规格说明书 |
-| `docs/designs/{版本号}/` | 系统设计、技术方案、开发文档（**不再含界面设计稿**） |
+| `docs/prds/{版本号}/` | 用户需求文档、用户需求规格说明书、需求说明（快速 / 增量链路） |
+| `docs/designs/{版本号}/` | 系统设计与迭代规划、开发规格与计划（spec + plan 一份）、开发文档（**不再含界面设计稿**） |
 | `docs/tests/{版本号}/` | 测试设计、测试用例、测试报告、验收报告、功能清单 |
 | `docs/reviews/{版本号}/` | 原型交付说明；历史评审文件保留原名 |
 
@@ -78,7 +78,7 @@ docs/{prds|designs|tests|reviews}/{版本号}/{文档类型}-{标识}.md
 ```text
 docs/prds/v2.0.0/用户需求文档-v2.0.0.md
 docs/prds/v2.0.0/用户需求文档-REQ-001.md
-docs/designs/v2.0.0/技术方案-REQ-001.md
+docs/designs/v2.0.0/开发规格与计划-REQ-001.md
 docs/tests/v2.0.0/测试设计-REQ-001.md
 docs/reviews/v2.0.0/原型交付说明-UI-001.md
 ```
@@ -100,7 +100,7 @@ docs/{prds|designs|tests|reviews}/{版本号}/{文档类型}-{标识}-{修订序
 1. 判断文档类型：需求 / 设计与开发 / 测试验收 / 评审 / 洞见账本 / 规范 / 配置 / 工程基建。
 2. 需求 / 设计 / 测试 / 原型交付说明 → `docs/<类型>/{版本号}/{文档类型}-{标识}.md`（版本归属拿不准 → SA 判定）；评审结论落账本。
 3. 洞见账本 → `docs/insights/`（一议题一份，不带版本前缀）；长期规则 → `docs/rules/`；配置或外部接口 → `docs/configs/`；工程基建 → `docs/infra/`。**这四类不建版本子目录。**
-   - **superpowers 产物（spec/plan）→ `docs/superpowers/{specs,plans}/`**：superpowers 的 writing-specs / writing-plans 等技能默认可能生成到仓库根 `superpowers/`，须归位到 `docs/superpowers/` 下，不留在根目录。
+   - **superpowers 插件自动生成的 spec/plan → `docs/superpowers/{specs,plans}/`**（链路里 SE 的 spec + plan 仍落 `docs/designs/{版本号}/`）：superpowers 的 writing-specs / writing-plans 等技能默认可能生成到仓库根 `superpowers/`，须归位到 `docs/superpowers/` 下，不留在根目录。
 4. 若文档出现在根目录，判断是否属于入口/工具约定；否则迁移到合适目录。
 5. 迁移后检查 Markdown 内部文件路径引用是否需要更新。
 6. 输出整理后的目录和文件清单。

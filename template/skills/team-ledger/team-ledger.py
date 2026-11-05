@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""观澜 Vista 团队协作状态账本（三条命令）。
+"""团队协作状态账本（三条命令）。
 
 事实源 = 追加式事件流 `.team-ledger/ledger.jsonl`（每次落账一行，`flock` + `O_APPEND` 原子）。
 
   team-ledger.py append --role se --item X --status 进行中 [--phase dev] [--round N]
                    [--decision APPROVED|CR] [--review 路径]
                    [--to pm|ui|se|qa|sa|owner] [--blocker-role ...] [--blocker ...]
-                   [--note ...] [--version v0.0.1|_infra]
+                   [--note ...] [--version <版本>|_infra]
   team-ledger.py stale [--hours N]    # 非终态且停滞 ≥ N 小时；--hours 0 = 全部非终态（当前态视图）
   team-ledger.py owner                # 卡在产品负责人手上、只能等人的项
 
 **不要往回加这些命令**：`verify-artifact` / `verify-candidate` / `show` / `render` /
-`owed` / `items` / `archive` / `set-version` / `log`。砍掉的理由见
-`docs/insights/协作流程方法论-洞见账本.md`，**不要重新发明**。
+`owed` / `items` / `archive` / `set-version` / `log`。不要它们的理由见同目录 `DESIGN.md`，
+**不要重新发明**。
 
-字段约定见 docs/infra/team-ledger.md。
+射程、形态与字段约定见同目录 `DESIGN.md`。
 """
 import argparse
 import fcntl
@@ -27,14 +27,14 @@ import unicodedata
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 
-ROLES = {"pm", "sa", "se", "qa", "ui"}  # ui：Web UI 原型，见契约 §一
+ROLES = {"pm", "sa", "se", "qa", "ui"}  # ui：Web UI 原型，见契约「角色」
 STATUSES = {"进行中", "待评审", "评审中", "阻塞", "完成", "交接"}
-# phase 锚定契约 §二 标准链路的各阶段/步骤，确保「走到哪一步」可统计
+# phase 锚定契约「标准链路」的各阶段/步骤，确保「走到哪一步」可统计
 PHASES = {"requirement", "design", "ui-design", "ui-proto", "spec", "plan",
           "dev", "ui-review", "test-design", "test-case", "test", "accept",
           "review", "deploy"}
 # ui-proto：阶段 1 的 UI Web 原型。
-# ui-design：历史账本行仍锚在它上面，不要删。
+# ui-design：存量账本行可能锚在它上面，保留以兼容，不要删。
 DECISIONS = {"APPROVED", "CR"}
 TERMINAL = {"完成", "交接"}
 # 「球在别人半场」的状态：落账只记接续方、不派活，棒由 SA 读账本后主动派出——
@@ -66,9 +66,9 @@ def _norm_phase(p):
 
 
 # `realpath` 而非 `abspath`：`.claude/skills` 是指向 `skills/` 的软链，两条路径都会被用来调用本脚本。
-# 用 abspath 时 `.claude/skills/team-ledger/team-ledger.py` 要往上数 4 层、`skills/team-ledger/team-ledger.py` 只需 3 层——
-# 旧实现写死 4 层，于是直接调用时 _REPO 落到了仓库的父目录（只在 git 解析失败的回落路径上生效，
-# 故一直没暴露）。realpath 先解开软链，两条调用路径从此同一个答案。
+# 用 abspath 时 `.claude/skills/team-ledger/team-ledger.py` 要往上数 4 层、`skills/team-ledger/team-ledger.py` 只需 3 层，
+# 写死任一层数都会让另一条调用路径的 _REPO 落错目录（只在 git 解析失败的回落路径上生效，不易察觉）。
+# realpath 先解开软链，两条调用路径算出同一个仓库根。
 _SELF = os.path.realpath(__file__)
 
 
@@ -246,7 +246,7 @@ def cmd_append(a):
             sys.exit(
                 f"工作项同事异名：{a.role} 已有「{_clash}」，本次写成「{a.item}」。\n"
                 f"当前态按 (role,item) 归并——换个写法就会拆成两行，其中一行永远收不了口。\n"
-                f"**一个 item ＝ 一条独立的评审线（契约 §附）**，"
+                f"**一个 item ＝ 一条独立的评审线（契约「附：状态账本」）**，"
                 f"拆成两行等于把一条线记成两条，其中一条没人认领。\n"
                 f"请原样沿用「{_clash}」；确属另一件事则加 --force-new-item。")
 
@@ -280,7 +280,7 @@ def cmd_append(a):
 def cmd_stale(a):
     """非终态且停滞 ≥ --hours 的工作项 —— 值守巡检用，也是唯一的当前态视图。
 
-    `--hours 0` 列出**全部非终态项**（`show` 砍掉后的替代：当前态现算现打，不落第二份文件）。
+    `--hours 0` 列出**全部非终态项**，即当前态视图：现算现打，不落第二份文件。
     只看非终态：`完成`/`交接` 已经把球交出去了，停着不算停滞。
     退出码：0=确无停滞  1=有停滞  2=有项判不了（ts 不可解析），不能报全清。
     """
@@ -371,9 +371,9 @@ def main():
     apd.add_argument("--status", required=True)
     apd.add_argument("--phase", default="")
     apd.add_argument("--round", type=int, default=None,
-                     help="评审轮次。契约 §五：每份产物最多一轮评审（封顶 1）")
+                     help="评审轮次。契约「评审与合入」：每份产物最多一轮评审（封顶 1）")
     apd.add_argument("--decision", default="", help="APPROVED | CR")
-    apd.add_argument("--review", default="", help="存量评审记录索引；新工作项不用（契约 §五：结论只落账本）")
+    apd.add_argument("--review", default="", help="存量评审记录索引；新工作项不用（契约「评审与合入」：结论只落账本）")
     apd.add_argument("--to", default="", help="交接/待评审 的接续方")
     apd.add_argument("--blocker-role", dest="blocker_role", default="",
                      help="阻塞 的被卡方；写 owner 则进待裁决清单")

@@ -1,15 +1,15 @@
 ---
 name: team-ledger
-description: 向观澜 Vista 团队协作状态账本落账。PM/UI/SE/QA/SA 在工作发生状态变更时（开工/待评审/评审中/阻塞/完成/交接）用本 skill 追加一条事件；SA 用它读当前态、查停滞、查待产品负责人裁决的项。
+description: 向团队协作状态账本落账。PM/UI/SE/QA/SA 在工作发生状态变更时（开工/待评审/评审中/阻塞/完成/交接）用本 skill 追加一条事件；SA 用它读当前态、查停滞、查待产品负责人裁决的项。
 ---
 
 # 团队协作状态账本（三条命令）
 
-事实源 = 追加式事件流 `.team-ledger/ledger.jsonl`（`flock` + `O_APPEND` 原子、并发安全）。**没有第二份文件** —— 当前态现算现打。机制与字段详见 `docs/infra/team-ledger.md`。
+事实源 = 追加式事件流 `.team-ledger/ledger.jsonl`（`flock` + `O_APPEND` 原子、并发安全）。**没有第二份文件** —— 当前态现算现打。射程、形态与字段详见同目录 `DESIGN.md`。
 
 ## 射程：它防什么、不防什么
 
-**不在射程内的别往回加**：核锚（`verify-artifact` / `verify-candidate`）· 渲染（`show` / `render`）· `owed` / `items` / `archive` / `set-version` / `log`。砍掉的理由见 `docs/insights/协作流程方法论-洞见账本.md`，**不要重新发明**。
+**不在射程内的别往回加**：核锚（`verify-artifact` / `verify-candidate`）· 渲染（`show` / `render`）· `owed` / `items` / `archive` / `set-version` / `log`。不要它们的理由见同目录 `DESIGN.md`「射程」，**不要重新发明**。
 
 ## 何时落账（全员）
 
@@ -28,20 +28,20 @@ description: 向观澜 Vista 团队协作状态账本落账。PM/UI/SE/QA/SA 在
 python3 skills/team-ledger/team-ledger.py append \
   --role <pm|ui|sa|se|qa> \
   --item <工作项短标识，如 i0-spec> \
-  --phase <requirement|design|ui-design|spec|plan|dev|ui-review|test-design|test-case|test|accept|review|deploy> \
+  --phase <requirement|design|ui-design|ui-proto|spec|plan|dev|ui-review|test-design|test-case|test|accept|review|deploy> \
   --status <进行中|待评审|评审中|阻塞|完成|交接> \
   [--round N] [--decision APPROVED|CR] \
   [--to pm|ui|se|qa|sa|owner] [--blocker-role …] [--blocker "卡在什么"] \
-  [--note "一句话摘要"] [--version v0.0.1|_infra]
+  [--note "一句话摘要"] [--version <版本>|_infra]
 ```
 
 - `--role` 填**你自己的角色**。`--item` 同一工作项跨状态**保持同名**（当前态按 `(role,item)` 取最新）。
 - **`--phase` / `--status` / `--decision` 有枚举校验**，非法值当场硬拒且**不落账**（校验不通过还落账 = 账本进脏数据）。中文门名（`开发`/`系统设计`/`界面走查`…）自动归一。
 - **非终态必须指定接续方**：`交接`/`待评审` 用 `--to`，`阻塞` 用 `--blocker-role`。落账**不派活**，接续方是给 SA 看的状态标记 —— 不写，SA 就看不出这棒该派给谁，等于掉棒。
 - **接续方是产品负责人**（等裁定 / 等排期）→ 写 `owner`：该项进待裁决清单（`team-ledger.py owner`），**只能等人，不派 subagent**。
-- **工作项名一件事只能有一个名**：派活方指定什么就原样用，不改写不翻译。大小写 / 空格 / 连字符 / 全角差异会被硬拒并提示既有原名。**一个 item ＝ 一条独立评审线**，不得换名重开评审；轮次按契约 §五执行。确属另起一项加 `--force-new-item`，**并在 `--note` 写明理由**（事件记 `forced_new_item` 留痕）。
+- **工作项名一件事只能有一个名**：派活方指定什么就原样用，不改写不翻译。大小写 / 空格 / 连字符 / 全角差异会被硬拒并提示既有原名。**一个 item ＝ 一条独立评审线**，不得换名重开评审；轮次按契约「评审与合入」执行（轮次封顶 1）。确属另起一项加 `--force-new-item`，**并在 `--note` 写明理由**（事件记 `forced_new_item` 留痕）。
 - **版本自动带**：取自仓库根 `system-version.json`（受 git 跟踪的真值源），读不到则落 `_infra` 并告警。**做基建 / 跨版本的活显式传 `--version _infra`**，免得被当前产品版本裹挟。
-- **评审结论只落账本**（`--decision` ＋ `--note`），**不再写评审记录文件**（契约 §五）；被评方另在 note 写「采纳 / 不采纳 ＋ 一句理由」。
+- **评审结论只落账本**（`--decision` ＋ `--note`），**不再写评审记录文件**（契约「评审与合入」）；被评方另在 note 写「采纳 / 不采纳 ＋ 一句理由」。
 - **DoD ＝ 产物已提交 ＋ 账本落终态。** 被评产物须先提交并以 `commit:path` 指认。
 - `--review` 仍受脚本支持，只为读存量索引；**新工作项不用它**。
 
@@ -60,6 +60,8 @@ python3 skills/team-ledger/team-ledger.py append \
 - **收口非终态行**：条件消失即落终态，否则僵尸行会淹掉 `stale` 的真信号。
 - **交接**：本阶段步骤完成后落 `status=交接` 并指定下一阶段负责人，随即派出对应 subagent。
 - **落账写明四样**：核了什么 · 判了什么 · 派给谁 · 边界是什么。**转发别人的结论前先自核可核的部分，并明说自己核了什么、没核什么** —— 只核形状，不替评审人下结论。
+
+换宿主或会话接班时的交接规程见 `docs/rules/双端协作与交接.md`；交接文档本身存放在 `.team-ledger/handoff.md`，和账本一样不入库、各 worktree 共用（主工作树下那一份）。
 
 ## 读账（SA 值守）
 
@@ -81,7 +83,7 @@ python3 skills/team-ledger/team-ledger.py owner              # 卡在产品负�
 ## 判据
 
 ```bash
-python3 skills/team-ledger/test_team_ledger.py      # 67 条，全程隔离到临时目录，不碰真实账本
+python3 skills/team-ledger/test_team_ledger.py      # 全程隔离到临时目录，不碰真实账本
 ```
 
-里面有两组**反向判据**：被砍的 9 个子命令与 4 个落锚参数**必须报 `invalid choice` / `unrecognized arguments`**。谁要把某条加回来，得先改那两条判据 —— 而不是悄悄长回 1000 行。
+里面有两组**反向判据**：不要的 9 个子命令与 4 个落锚参数**必须报 `invalid choice` / `unrecognized arguments`**。谁要把某条加回来，得先改那两条判据 —— 而不是悄悄长回去。

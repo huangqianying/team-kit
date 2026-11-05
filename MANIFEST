@@ -1,0 +1,32 @@
+# team-kit 内核清单：每行一个相对工程根的路径；以 / 结尾的是目录（整目录同步）。
+# 这些文件在所有工程逐字相同，由 bin/kit 从 template/ 同步，工程内不单独改。
+AGENTS.md
+CLAUDE.md
+docs/rules/团队协作契约.md
+docs/rules/双端协作与交接.md
+docs/rules/roles/pm.md
+docs/rules/roles/ui.md
+docs/rules/roles/se.md
+docs/rules/roles/qa.md
+.claude/agents/pm.md
+.claude/agents/ui.md
+.claude/agents/se.md
+.claude/agents/qa.md
+.claude/settings.json
+.codex/agents/pm.toml
+.codex/agents/ui.toml
+.codex/agents/se.toml
+.codex/agents/qa.toml
+.codex/config.toml
+skills/team-ledger/
+skills/sa-review/
+skills/technical-review/
+skills/manage-docs/
+skills/progress-report/
+skills/requirements-analysis/
+skills/insight-discovery/
+skills/insight-ledger/
+skills/ui-design/
+.githooks/pre-commit
+.githooks/install.sh
+.githooks/tests/hooks.test.sh

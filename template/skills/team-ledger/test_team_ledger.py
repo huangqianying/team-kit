@@ -2,7 +2,7 @@
 """team-ledger.py 的判据。跑法：python3 skills/team-ledger/test_team_ledger.py
 
 **全程用 `TEAM_LEDGER_DIR` 隔离到临时目录，绝不碰真实账本。**
-不引 pytest（仓库里没有，且账本是运维工具、不该为测试拉依赖），沿用原有的 check() харness。
+不引 pytest（账本是运维工具、不该为测试拉依赖），用文件内的 check() harness，直接运行本文件即可。
 每条判据都走子进程，因为被测对象**包含退出码**——值守与门禁都按退出码分支，
 `sys.exit` 在同进程里测不出它真实的那一面。
 """
@@ -124,8 +124,9 @@ def t_owner_successor(tmp):
 # ──────────────── 同事异名硬拒：「一个 item ＝ 一条评审线」的前提 ────────────────
 
 def t_item_clash(tmp):
-    """归一键相同即判同一工作项。轮次按「同一 item 的同一门」累计（契约 :105），
-    拆成两行等于把一条评审线记成两条，其中一条没人认领 —— 故这条是粒度判据的前提，不是洁癖。"""
+    """归一键相同即判同一工作项。契约「附：状态账本」定「一个 item ＝ 一条独立的评审线」，
+    轮次按 item 计（契约「评审与合入」：轮次封顶 1）；拆成两行等于把一条评审线记成两条，
+    其中一条没人认领 —— 故这条是粒度判据的前提，不是洁癖。"""
     for second in ("Gate-3_Design", "gate3design", "gate3　design"):
         d = tempfile.mkdtemp(dir=tmp)
         env = mkenv(d)
@@ -166,7 +167,7 @@ def t_stale_quiet(tmp):
 
 
 def t_stale_hours0(tmp):
-    """`--hours 0` 是 `show` 砍掉后的当前态视图：现算现打，不落第二份文件。"""
+    """`--hours 0` 是当前态视图：现算现打，不落第二份文件。"""
     env = mkenv(tmp)
     append(env, role="se", item="做着的", status="进行中")
     append(env, role="pm", item="等评审的", status="待评审", to="sa")
@@ -220,7 +221,7 @@ def t_owner(tmp):
 
 
 def t_owner_closed(tmp):
-    """只看当前态——否则清单会被历史项淹掉，重蹈 stale 被僵尸行淹没的覆辙。"""
+    """只看当前态——否则清单会被已收口的历史项淹掉，真待裁决的项反而看不见。"""
     env = mkenv(tmp)
     append(env, role="se", item="x", status="阻塞", blocker_role="owner", blocker="等他定")
     append(env, role="se", item="x", status="完成", note="他定了")
@@ -240,25 +241,25 @@ def t_concurrent(tmp):
     check("无半截行", len({e["item"] for e in evs}) == 20)
 
 
-# ───────────────────── 砍掉的命令不许悄悄回来 ─────────────────────
+# ───────────────────── 不要的命令不许悄悄回来 ─────────────────────
 
 def t_removed_subcommands(tmp):
-    """产品负责人 2026-10-15 定「砍到三条」。这条判据是那个决定的落点：
-    谁要把某条加回来，得先改这里，而不是悄悄长回 1000 行。"""
+    """账本只有三条命令（射程见 DESIGN.md）。这条判据钉住射程：
+    谁要把某条加回来，得先改这里，而不是悄悄长回去。"""
     env = mkenv(tmp)
     for gone in ("show", "render", "log", "owed", "items", "archive",
                  "set-version", "verify-artifact", "verify-candidate"):
         r = run(env, gone)
-        check(f"子命令已砍：{gone}", r.returncode != 0 and "invalid choice" in out(r), out(r)[:120])
+        check(f"子命令不存在：{gone}", r.returncode != 0 and "invalid choice" in out(r), out(r)[:120])
 
 
 def t_removed_anchor_flags(tmp):
-    """取证口径 2026-10-15 放宽后这些锚没有核证方了。
+    """这些锚没有核证方：产物版本与证据由契约统一规定，账本不核锚、也不派活。
     留着一个没人核的锚，和一个正确的锚在账本里长得一模一样。"""
     env = mkenv(tmp)
     for gone in ("--artifact", "--at", "--candidate", "--job"):
         r = run(env, "append", "--role", "se", "--item", "x", "--status", "进行中", gone, "随便")
-        check(f"落锚参数已砍：{gone}",
+        check(f"落锚参数不存在：{gone}",
               r.returncode != 0 and "unrecognized arguments" in out(r), out(r)[:120])
 
 

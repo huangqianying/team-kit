@@ -1,118 +1,190 @@
 #!/usr/bin/env bash
-# 提交准入门禁 · 凭据防泄漏——部署凭据文件与明文口令不得进仓库。
+# 提交准入门禁 · 凭据防泄漏——凭据文件与明文口令不得进仓库。
 #
-# UI 走查门禁在 `commit-msg`，不在这里：**pre-commit 不接收任何参数**，
-# 且 `-m` 的消息要等它跑完才写进 COMMIT_EDITMSG，在这里读消息只会读到上一次的。
-# 挡不住 --no-verify（如实说）。
+# 本文件是团队基建内核，各工程逐字相同；工程专属的路径、白名单与提示写在
+# `.githooks/project.conf`（bash 变量文件，由本脚本 source，kit 同步不覆盖）。
+# 变量清单见下方「工程配置」。project.conf 缺失时按内核默认判据照常扫描，并提示一行。
+#
+# 挡不住 git commit --no-verify（如实说）。钩子要生效须先执行 `bash .githooks/install.sh`。
 set -euo pipefail
 
-# ═══ A. 凭据防泄漏 ═══════════════════════════════════════════
-staged=$(git diff --cached --name-only --diff-filter=ACMR || true)
+root="$(git rev-parse --show-toplevel)"
+conf="${root}/.githooks/project.conf"
 
-# A1. 凭据文件本身被 staged（含 git add -f 绕过 .gitignore）
-cred_hit=$(printf '%s\n' "$staged" | grep -E '(^|/)\.deploy/credentials\.ini$|(^|/)\.env(\.|$)' | grep -v '\.example$' || true)
-if [ -n "$cred_hit" ]; then
-  echo "❌ 凭据文件不得提交：" >&2
-  printf '   %s\n' $cred_hit >&2
-  echo "   这类文件只存在于本地磁盘。要提交模板请改 .deploy/credentials.ini.example（不得填真值）。" >&2
+# ═══ 工程配置（全部可选；正则一律为 Python re 语法，用 re.search 匹配仓库相对路径）═══
+# HOOK_CRED_FILE_RE           追加的凭据文件路径；命中即拒（以 .example 结尾的除外）。
+# HOOK_TEST_PATH_RE           追加的测试路径；命中的文件不做口令内容扫描。
+# HOOK_CONFIG_PATH_RE         追加的配置类路径；命中的文件连裸值一起扫。
+# HOOK_SECRET_ALLOW_VALUE_RE  已知不是口令的业务取值；口令字段的值整体匹配时放行（re.fullmatch）。
+# HOOK_CRED_HINT              拒绝时附加的一行指引（本工程凭据放哪、模板叫什么）。
+HOOK_CRED_FILE_RE=""
+HOOK_TEST_PATH_RE=""
+HOOK_CONFIG_PATH_RE=""
+HOOK_SECRET_ALLOW_VALUE_RE=""
+HOOK_CRED_HINT=""
+if [ -f "$conf" ]; then
+  # shellcheck source=/dev/null
+  source "$conf"
+else
+  echo "ℹ️  未找到 .githooks/project.conf：按内核默认判据扫描（无工程追加路径、无白名单）。" >&2
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "❌ 凭据门禁需要 python3，当前环境找不到；装好后再提交。" >&2
   exit 1
 fi
 
-# A2. 提交内容里出现有真值的密码字段
-#    值必须「像口令」才报：配置文件允许裸值；代码文件只认带引号的字面量。
-#    散文里的「password = 不算」「密码 = 见配置」是中文说明不是口令；${VAR}、<占位>、
-#    ***、xxx 同理。用 python 判，grep 表达不了这个。
-#    测试文件（tests/、.test.、.spec. 等）与 .example 跳过内容扫描：夹具本就该带假口令，
-#    逐个加白名单是打地鼠。
-#    代价（如实说）：真凭据藏进测试文件不会被本门拦住。凭据**文件名**的拦截（A1）
-#    不受此豁免，对所有路径生效。
-secret_hit=$(git diff --cached -U0 --diff-filter=ACMR -- . ':(exclude)*.example' \
-  | python3 -c '
-import re, sys
-KEY = re.compile(r"(DEPLOY_PASSWORD|password|passwd|secret_key|api_key|token)\b\s*[=:]\s*", re.I)
-# 空字面量须在相邻的闭引号结束，不能跨到下一个字段的开引号。
-QUOTED = re.compile(r"^([\x27\"`])(.*?)\1")
+# 判据用 python 写：「值像不像口令」grep 表达不了。
+# python 自身出错（正则写错、git 调用失败）以非零退出拦下，不当作「没有命中」放行。
+export HOOK_CRED_FILE_RE HOOK_TEST_PATH_RE HOOK_CONFIG_PATH_RE HOOK_SECRET_ALLOW_VALUE_RE HOOK_CRED_HINT
+exec python3 -c '
+import os, re, subprocess, sys
+
+def conf_re(name):
+    v = os.environ.get(name, "").strip()
+    try:
+        return re.compile(v) if v else None
+    except re.error as e:
+        raise SystemExit(f"❌ .githooks/project.conf 的 {name} 不是合法正则：{e}")
+
+CRED_EXTRA = conf_re("HOOK_CRED_FILE_RE")
+TEST_EXTRA = conf_re("HOOK_TEST_PATH_RE")
+CONFIG_EXTRA = conf_re("HOOK_CONFIG_PATH_RE")
+ALLOW_VALUE = conf_re("HOOK_SECRET_ALLOW_VALUE_RE")
+HINT = os.environ.get("HOOK_CRED_HINT", "").strip()
+
+def git(*args):
+    return subprocess.run(["git", "-c", "core.quotepath=false", *args],
+                          check=True, stdout=subprocess.PIPE).stdout
+
+def say(*lines):
+    for s in lines:
+        print(s, file=sys.stderr)
+
+def tail_hint():
+    if HINT:
+        say("   " + HINT)
+
+# ─── A1. 凭据文件本身被暂存（含 git add -f 绕过 .gitignore）──────────────
+CRED_FILE = re.compile(r"(^|/)\.env(\.|$)")
+staged = [p.decode("utf-8", "replace")
+          for p in git("diff", "--cached", "--name-only", "-z", "--diff-filter=ACMR").split(b"\0") if p]
+cred_hit = [p for p in staged
+            if not p.endswith(".example")
+            and (CRED_FILE.search(p) or (CRED_EXTRA and CRED_EXTRA.search(p)))]
+if cred_hit:
+    say("❌ 凭据文件不得提交：", *("   " + p for p in cred_hit),
+        "   这类文件只存在于本地磁盘；要入库的模板用同名 .example 文件（不得填真值）。")
+    tail_hint()
+    sys.exit(1)
+
+# ─── A2. 提交内容里出现有真值的口令字段 ──────────────────────────────
+# 值必须「像口令」才报：纯 ASCII、去空白后非空、长度 >= 4、不是常见假值与占位。
+#   配置类文件（.env/.ini/.yaml/.conf/.toml/.properties/.sh 等）：裸值与带引号的值都扫。
+#   代码文件：只认字面量——字段直接等于字面量、带类型标注后等于字面量、
+#     或同一行声明里用 default= 给了字面量；标识符、属性访问、函数调用是表达式，不是口令。
+#   .vue 动态绑定（:x、@x、v-bind:x、v-on:x、#x）：属性值是 JS 表达式，整体是字面量才扫。
+#   Markdown 里反引号是行内代码，不是字符串字面量。
+#   值里含 $(…) / ${…} 是运行时展开生成的，不是字面口令。
+# 测试文件与 .example 跳过内容扫描：夹具本就该带假口令，逐个加白名单是打地鼠。
+# 代价（如实说）：真凭据藏进测试文件不会被本门拦住；凭据文件名的拦截（A1）不受此豁免。
+KEY = re.compile(r"(password|passwd|secret_key|api_key|token)\b\s*[=:]\s*", re.I)
+
+def literal_res(backtick):
+    # 带引号的字面量；反斜杠转义的引号留在值里，藏不住后缀。
+    lit = r"(?:\x27(?:\\.|[^\x27\\])*\x27|\"(?:\\.|[^\"\\])*\"" + (r"|`(?:\\.|[^`\\])*`" if backtick else "") + ")"
+    return (re.compile(lit),
+            re.compile(r"[A-Za-z_][\w.\[\]|, <>]*?\s*=(?![=>])\s*(?P<lit>" + lit + ")"),   # 带类型标注
+            re.compile(r"\b(?:server_)?default\s*=\s*(?P<lit>" + lit + ")"))               # 声明里的 default=
+
+CODE_LIT = literal_res(True)
+PROSE_LIT = literal_res(False)
+PROSEPATH = re.compile(r"\.(md|markdown)$", re.I)
+EXPANSION = re.compile(r"\$[({]")
+VUE_DYNAMIC = re.compile(r"(?:^|[\s<])(?:[:@#]|v-[\w-]+:)(?:[\w-]+:)?$")
+VUE_ATTR = re.compile(r"\"([^\"]*)\"|\x27([^\x27]*)\x27")
 DUMMY = {"secret", "dummy", "fake", "test", "testing", "example", "password", "pass", "none", "null"}
-PLACEHOLDER = re.compile(r"^[\x27\"]?(\$\{?[A-Za-z_]|<|\*{3,}|\.{3}|xxx|placeholder|changeme|your[-_]?)", re.I)
+# 变量与命令展开、格式占位、<占位>、***、...、xxx 等都不是字面口令
+PLACEHOLDER = re.compile(r"^[\x27\"]?(\$[\w{(@*#?!-]|%|<|\*{3,}|\.{3}|xxx|placeholder|changeme|your[-_]?)", re.I)
 TESTPATH = re.compile(r"(^|/)tests?/|\.test\.|\.spec\.|(^|/)test_|_test\.", re.I)
-CONFIGPATH = re.compile(r"(^|/)\.env(?:\.|$)|\.(?:env|ini|ya?ml|conf|properties|toml)$", re.I)
+CONFIGPATH = re.compile(r"(^|/)\.env(\.|$)|(^|/)\.(npmrc|pypirc|netrc)$|(^|/)Dockerfile(\.[\w-]+)?$"
+                        r"|\.(env|ini|cfg|cnf|conf|properties|toml|ya?ml|sh|bash)$", re.I)
+
+def unquote(p):
+    if len(p) >= 2 and p[0] == p[-1] == "\"":      # git 对特殊字符路径做 C 风格转义
+        p = p[1:-1].encode("utf-8").decode("unicode_escape").encode("latin-1").decode("utf-8", "replace")
+    return p[2:] if p.startswith("b/") else p
+
+def looks_secret(val):
+    if not val.strip() or PLACEHOLDER.match(val) or EXPANSION.search(val):
+        return False
+    if not val.isascii() or len(val) < 4 or val.lower() in DUMMY:
+        return False
+    if ALLOW_VALUE and ALLOW_VALUE.fullmatch(val):
+        return False
+    return True
+
+def value_of(line, m, kind):
+    rest = line[m.end():]
+    literal, typed, default = PROSE_LIT if kind == "prose" else CODE_LIT
+    if kind == "vue" and VUE_DYNAMIC.search(line[:m.start()]):
+        attr = VUE_ATTR.match(rest)
+        if not attr:
+            return None
+        expr = (attr.group(1) if attr.group(1) is not None else attr.group(2)).strip()
+        lit = literal.fullmatch(expr)
+        return lit.group(0)[1:-1] if lit else None
+    lit = literal.match(rest)
+    if lit:
+        return lit.group(0)[1:-1]
+    if kind == "config":
+        return (rest.split(None, 1)[0] if rest.strip() else "").strip("\x27\"`,;)")
+    found = typed.match(rest) or default.search(rest)
+    return found.group("lit")[1:-1] if found else None
+
+def kind_of(path):
+    if CONFIGPATH.search(path) or (CONFIG_EXTRA and CONFIG_EXTRA.search(path)):
+        return "config"
+    if path.endswith(".vue"):
+        return "vue"
+    if PROSEPATH.search(path):
+        return "prose"
+    return "code"
+
+diff = git("diff", "--cached", "-U0", "--no-color", "--no-ext-diff", "--no-textconv",
+           "--src-prefix=a/", "--dst-prefix=b/", "--diff-filter=ACMR",
+           "--", ".", ":(exclude)*.example").decode("utf-8", "replace")
 hits = []
-skip = False
-path = ""
-for line in sys.stdin:
-    if line.startswith("+++ "):                 # 新文件段开始：判这个文件要不要扫
-        path = line[4:].strip()
-        path = path[2:] if path.startswith("b/") else path
-        skip = bool(TESTPATH.search(path))
+path, skip, kind, header = "", True, "code", False
+for line in diff.splitlines():
+    if line.startswith("diff --git "):
+        header = True
+        continue
+    if header:
+        if line.startswith("+++ "):                 # 新文件段：判这个文件扫不扫、按哪类扫
+            path = unquote(line[4:].strip())
+            skip = bool(TESTPATH.search(path) or (TEST_EXTRA and TEST_EXTRA.search(path)))
+            kind = kind_of(path)
+        elif line.startswith("@@"):
+            header = False
         continue
     if skip or not line.startswith("+"):
         continue
-    # 一行可能同时有空表单字段与真实口令，须逐字段扫描。
-    for m in KEY.finditer(line):
-        remainder = line[m.end():].lstrip()
-        if CONFIGPATH.search(path):
-            val = (remainder.split(None, 1)[0] if remainder else "").strip("\x27\"`,;)")
-        else:
-            literal = QUOTED.match(remainder)
-            if not literal:
-                continue
-            val = literal.group(2)
-        if not val.strip() or PLACEHOLDER.match(val):
-            continue
-        if not val.isascii():          # 中文说明文字，不是口令
-            continue
-        if len(val) < 4:               # 太短不像口令（含空值、= 号残留）
-            continue
-        if val.lower() in DUMMY:       # 常见假值
-            continue
-        hits.append(line.rstrip())
-        break
-print("\n".join(hits[:5]))
-' || true)
-if [ -n "$secret_hit" ]; then
-  echo "❌ 提交内容疑似含明文凭据：" >&2
-  printf '%s\n' "$secret_hit" | head -5 >&2
-  echo "   改为从 .deploy/credentials.ini 读取，或用 \${DEPLOY_PASSWORD} 占位。" >&2
-  echo "   确属误报时用 git commit --no-verify（并说明理由）。" >&2
-  exit 1
-fi
+    text = line[1:]
+    # 一行可能同时有空字段与真实口令，须逐字段扫描。
+    for m in KEY.finditer(text):
+        val = value_of(text, m, kind)
+        if val is not None and looks_secret(val):
+            hits.append(f"{path}: {text.strip()[:160]}")
+            break
 
-# ═══ B. 被引文档编辑触发 spec 引用核 ══════════════════════════
-# spec 用行号引用契约 / 设计稿 / UI 规范；被引方一改，其后所有引用即指向错误
-# 内容。此前只有 spec 侧跑 check-spec-refs 时才发现——实发七次全靠偶然撞上，
-# 其中两次改契约后 develop 的 spec 门红了数小时，下游正在这道红门上做发布证据。
-# 这里把「谁改谁负责」落成机械门：改被引方就当场核。
-#
-# 触发面 = spec §1.2 mapping 声明的被引路径；改动其它文件不触发。
-# 代价（如实说）：同样挡不住 --no-verify；spec 自身被改不由本门负责（它归 dev00:gate）。
-referenced_paths_re='^(docs/(prds|designs|rules)/|docs/reviews/.*(PM需求终裁|PM需求裁定|PM评审))'
-# core.quotepath=false：中文路径默认会被转义成 "docs/rules/\345\233\242..." 带引号输出，
-# 开头的引号让 `^docs/` 匹配不上——docs/rules/ 下的规范多为中文名（UI设计规范、团队协作契约），
-# 不关掉就是整条规则对它们静默失效。
-ref_hit="$(git -c core.quotepath=false diff --cached --name-only --diff-filter=ACMR | grep -E "$referenced_paths_re" || true)"
-
-if [ -n "$ref_hit" ]; then
-  checker="docs/superpowers/specs/check-spec-refs.mjs"
-  if [ -f "$checker" ]; then
-    if ! ref_out="$(node "$checker" 2>&1)"; then
-      # checker 跑不起来（依赖缺失、语法错）与「引用失配」是两回事，分开说，
-      # 否则会把环境问题误报成产物问题、把人引到错误的修法上。
-      if ! printf '%s' "$ref_out" | grep -q 'spec-ref-lint\|SPEC_\|: '; then
-        echo "✗ 提交被拒：spec 引用核无法运行（非引用失配）" >&2
-        printf '%s\n' "$ref_out" | head -5 | sed 's/^/    /' >&2
-        echo "  → 先修好 checker 可运行性（依赖是否已装），再提交。" >&2
-        exit 1
-      fi
-      echo "✗ 提交被拒：改动了 spec 的被引文档，引用核不通过" >&2
-      echo "  触及：" >&2
-      printf '    %s\n' $ref_hit >&2
-      echo "$ref_out" | grep -vE '^spec-ref-lint ' | head -8 | sed 's/^/    /' >&2
-      echo "  → 先跑 \`pnpm spec:reanchor\` 重算锚，再提交；" >&2
-      echo "    若失配属引用目标失效（工具报「无法自动修复」），需人工改正文引用行号。" >&2
-      exit 1
-    fi
-  fi
-fi
-
-
-exit 0
+if hits:
+    say("❌ 提交内容疑似含明文凭据：", *("   " + h for h in hits[:5]))
+    if len(hits) > 5:
+        say(f"   …共 {len(hits)} 处，仅列前 5 处。")
+    say("   改为从本地不入库的凭据文件读取，或用 ${VAR} 占位。")
+    tail_hint()
+    say("   确属误报时用 git commit --no-verify（并说明理由）。")
+    sys.exit(1)
+sys.exit(0)
+'

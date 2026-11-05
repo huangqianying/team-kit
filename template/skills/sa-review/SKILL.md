@@ -1,9 +1,11 @@
 ---
 name: sa-review
-description: Use when SA reviews requirements, system designs, specs, test designs, or test cases in 观澜 Vista.
+description: Use when SA reviews requirement documents (technical opinion), spec+plan documents, or test design+case documents (advisory, one round). Not for SA's own system designs.
 ---
 
 # SA 评审
+
+**适用**：需求文档（SA 提技术意见，需求内容之争 PM 终裁）、spec + plan 一份文档（契约 §二.3、§二.4）、测试方案 + 用例一份文档（契约 §二.4）；建议级，一轮。SA 不评自己写的系统设计 —— 系统设计由 SE 判可实现性、PM 判需求符合性（契约 §二.4）。
 
 评审范围、通过条件和证据要求以 `docs/rules/团队协作契约.md` §五为准。技术正确性检查见 `technical-review`；本文补充重要判据与引用的检查方法。
 

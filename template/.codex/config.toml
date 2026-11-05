@@ -1,5 +1,22 @@
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 
+[features]
+multi_agent = true
+
 [agents]
 enabled = true
+max_concurrent_threads_per_session = 4
+
+# 显式注册四个角色；职责与描述只在各自入口文件里维护。
+[agents.pm]
+config_file = "agents/pm.toml"
+
+[agents.ui]
+config_file = "agents/ui.toml"
+
+[agents.se]
+config_file = "agents/se.toml"
+
+[agents.qa]
+config_file = "agents/qa.toml"

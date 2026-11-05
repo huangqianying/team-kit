@@ -1,0 +1,298 @@
+#!/usr/bin/env python3
+"""team-kit：把团队基建内核同步到工程，并核对工程是否与内核一致。
+
+用法（kit 仓库内执行，<工程> 为工程根目录）：
+  bin/kit install <工程> [--allow-dirty]          首次安装：拷内核、建软链、生成工程配置模板、装钩子
+  bin/kit sync    <工程> [--force] [--allow-dirty] 同步内核到工程（工程里改过内核文件时拒绝，--force 覆盖）
+  bin/kit check   <工程>                          核对一致性；不一致退出 1
+  bin/kit diff    <工程> [路径 …]                 打印工程与内核的差异（回收工程内的改进时用）
+
+退出码：0 一致 / 成功 · 1 有差异或被拒 · 2 用法错误
+"""
+import argparse
+import difflib
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+from datetime import datetime, timezone
+
+KIT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+TEMPLATE = os.path.join(KIT, "template")
+PROFILE = os.path.join(KIT, "profile")
+STAMP = ".team-kit.json"
+SYMLINKS = {".claude/skills": "../skills", ".codex/skills": "../skills"}
+GITIGNORE_LINE = ".team-ledger/"
+PROFILE_DOC = "docs/rules/工程配置.md"
+IGNORED_NAMES = {"__pycache__", ".DS_Store"}
+
+
+def manifest_entries():
+    with open(os.path.join(KIT, "MANIFEST"), encoding="utf-8") as f:
+        return [l.strip() for l in f if l.strip() and not l.lstrip().startswith("#")]
+
+
+def _walk(base, rel_dir):
+    out = []
+    root = os.path.join(base, rel_dir)
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if d not in IGNORED_NAMES)
+        for name in sorted(filenames):
+            if name in IGNORED_NAMES or name.endswith(".pyc"):
+                continue
+            out.append(os.path.relpath(os.path.join(dirpath, name), base))
+    return out
+
+
+def kernel_files():
+    """内核文件（相对工程根）与目录型条目。"""
+    files, dirs = [], []
+    for e in manifest_entries():
+        if e.endswith("/"):
+            dirs.append(e.rstrip("/"))
+            files.extend(_walk(TEMPLATE, e.rstrip("/")))
+        else:
+            files.append(e)
+    return files, dirs
+
+
+def sha(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        h.update(f.read())
+    return h.hexdigest()
+
+
+def is_exec(path):
+    return os.access(path, os.X_OK)
+
+
+def git(project, *args, check=False):
+    return subprocess.run(["git", "-C", project, *args], capture_output=True, text=True, check=check)
+
+
+def kit_commit():
+    head = git(KIT, "rev-parse", "HEAD").stdout.strip() or "unknown"
+    dirty = bool(git(KIT, "status", "--porcelain").stdout.strip())
+    return head + ("+dirty" if dirty else "")
+
+
+def read_stamp(project):
+    p = os.path.join(project, STAMP)
+    if not os.path.exists(p):
+        return None
+    with open(p, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def profile_sections():
+    with open(os.path.join(PROFILE, PROFILE_DOC), encoding="utf-8") as f:
+        return [l.strip() for l in f if l.startswith("## ")]
+
+
+# ---------- check ----------
+
+def check(project, quiet=False):
+    errors, warns = [], []
+    files, dirs = kernel_files()
+    for rel in files:
+        src, dst = os.path.join(TEMPLATE, rel), os.path.join(project, rel)
+        if not os.path.exists(dst):
+            errors.append(f"缺失    {rel}")
+        elif sha(src) != sha(dst):
+            errors.append(f"不一致  {rel}")
+        elif is_exec(src) != is_exec(dst):
+            errors.append(f"权限    {rel}（可执行位与内核不同）")
+    tset = set(files)
+    for d in dirs:
+        if os.path.isdir(os.path.join(project, d)):
+            for rel in _walk(project, d):
+                if rel not in tset:
+                    errors.append(f"多出    {rel}（内核目录里没有）")
+    for link, target in SYMLINKS.items():
+        p = os.path.join(project, link)
+        if not os.path.islink(p) or os.readlink(p) != target:
+            errors.append(f"软链    {link} 应指向 {target}")
+    pdoc = os.path.join(project, PROFILE_DOC)
+    if not os.path.exists(pdoc):
+        errors.append(f"工程配置 {PROFILE_DOC} 不存在")
+    else:
+        text = open(pdoc, encoding="utf-8").read()
+        have = {l.strip() for l in text.splitlines() if l.startswith("## ")}
+        for s in profile_sections():
+            if s not in have:
+                errors.append(f"工程配置 缺节「{s[3:]}」（节名是内核引用的锚点）")
+        if "<例" in text or "<…>" in text:
+            warns.append(f"工程配置 {PROFILE_DOC} 仍有未填的模板占位")
+    if not os.path.exists(os.path.join(project, ".githooks/project.conf")):
+        errors.append("钩子配置 .githooks/project.conf 不存在")
+    hp = git(project, "config", "--get", "core.hooksPath").stdout.strip()
+    if hp != ".githooks":
+        errors.append(f"钩子    core.hooksPath={hp or '未设置'}，应为 .githooks（执行 bash .githooks/install.sh）")
+    gi = os.path.join(project, ".gitignore")
+    lines = open(gi, encoding="utf-8").read().splitlines() if os.path.exists(gi) else []
+    if not any(l.strip().rstrip("/") == GITIGNORE_LINE.rstrip("/") for l in lines):
+        errors.append(f".gitignore 缺 {GITIGNORE_LINE}（账本与交接文档不入库）")
+    stamp = read_stamp(project)
+    if stamp is None:
+        warns.append(f"{STAMP} 不存在（未经 kit 安装）")
+    elif stamp.get("kit_commit") != kit_commit():
+        warns.append(f"{STAMP} 记录的 kit 提交 {stamp.get('kit_commit')}，当前 kit 为 {kit_commit()}")
+    if not quiet:
+        print(f"[kit check] {project}")
+        print(f"  内核 {len(files)} 个文件，kit {kit_commit()}")
+        for e in errors:
+            print("  ✗ " + e)
+        for w in warns:
+            print("  ! " + w)
+        print("  ✓ 与内核一致" if not errors else f"  共 {len(errors)} 处不一致")
+    return errors, warns
+
+
+# ---------- install / sync ----------
+
+def dirty_kernel_paths(project, files):
+    existing = [f for f in files if os.path.exists(os.path.join(project, f))]
+    if not existing:
+        return []
+    out = git(project, "status", "--porcelain", "--", *existing).stdout
+    return [l for l in out.splitlines() if l.strip()]
+
+
+def write_stamp(project, files):
+    data = {
+        "kit_commit": kit_commit(),
+        "synced_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "files": {f: sha(os.path.join(project, f)) for f in files},
+    }
+    with open(os.path.join(project, STAMP), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
+def apply(project, mode, force=False, allow_dirty=False):
+    if not os.path.isdir(os.path.join(project, ".git")) and not git(project, "rev-parse", "--git-dir").stdout.strip():
+        print(f"[kit {mode}] {project} 不是 git 仓库", file=sys.stderr)
+        return 1
+    files, _ = kernel_files()
+    if not allow_dirty:
+        dirty = dirty_kernel_paths(project, files)
+        if dirty:
+            print(f"[kit {mode}] 拒绝：工程里这些内核文件有未提交改动（先提交或另行处理，或加 --allow-dirty）：", file=sys.stderr)
+            for l in dirty:
+                print("  " + l, file=sys.stderr)
+            return 1
+    stamp = read_stamp(project)
+    if mode == "sync" and not force:
+        recorded = (stamp or {}).get("files", {})
+        local = []
+        for rel in files:
+            dst = os.path.join(project, rel)
+            if os.path.exists(dst) and rel in recorded and sha(dst) != recorded[rel] \
+                    and sha(dst) != sha(os.path.join(TEMPLATE, rel)):
+                local.append(rel)
+        if local:
+            print("[kit sync] 拒绝：工程里改过这些内核文件，先把改进收回 kit（bin/kit diff 查看），或加 --force 覆盖：", file=sys.stderr)
+            for rel in local:
+                print("  " + rel, file=sys.stderr)
+            return 1
+    changed = []
+    for rel in files:
+        src, dst = os.path.join(TEMPLATE, rel), os.path.join(project, rel)
+        if os.path.exists(dst) and sha(src) == sha(dst) and is_exec(src) == is_exec(dst):
+            continue
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy2(src, dst)
+        changed.append(rel)
+    for link, target in SYMLINKS.items():
+        p = os.path.join(project, link)
+        if os.path.islink(p):
+            if os.readlink(p) != target:
+                os.remove(p)
+                os.symlink(target, p)
+                changed.append(link)
+        elif os.path.exists(p):
+            print(f"[kit {mode}] {link} 是实体目录而不是软链，未改动，请人工处理", file=sys.stderr)
+        else:
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            os.symlink(target, p)
+            changed.append(link)
+    created = []
+    for rel in _walk(PROFILE, "."):
+        dst = os.path.join(project, rel)
+        if not os.path.exists(dst):
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(os.path.join(PROFILE, rel), dst)
+            created.append(rel)
+    gi = os.path.join(project, ".gitignore")
+    lines = open(gi, encoding="utf-8").read().splitlines() if os.path.exists(gi) else []
+    if not any(l.strip().rstrip("/") == GITIGNORE_LINE.rstrip("/") for l in lines):
+        with open(gi, "a", encoding="utf-8") as f:
+            if lines and lines[-1].strip():
+                f.write("\n")
+            f.write("# 团队状态账本与交接文档（team-kit）：不入库，各 worktree 共用主工作树那一份\n")
+            f.write(GITIGNORE_LINE + "\n")
+        changed.append(".gitignore")
+    hook_install = os.path.join(project, ".githooks/install.sh")
+    if os.path.exists(hook_install):
+        r = subprocess.run(["bash", hook_install], cwd=project, capture_output=True, text=True)
+        if r.returncode != 0:
+            print(f"[kit {mode}] 钩子安装失败：{r.stderr.strip()}", file=sys.stderr)
+            return 1
+    write_stamp(project, files)
+    print(f"[kit {mode}] {project}  kit {kit_commit()}")
+    print(f"  更新 {len(changed)} 处" + ("：" if changed else ""))
+    for c in changed:
+        print("    " + c)
+    for c in created:
+        print(f"  新建工程专属文件 {c}（请按本工程填写，kit 之后不再覆盖）")
+    print("  未提交：请在工程里核对后自行提交（含 .team-kit.json）")
+    return 0
+
+
+def diff(project, paths):
+    files, _ = kernel_files()
+    targets = paths or files
+    found = False
+    for rel in targets:
+        src, dst = os.path.join(TEMPLATE, rel), os.path.join(project, rel)
+        a = open(src, encoding="utf-8", errors="replace").read().splitlines(True) if os.path.exists(src) else []
+        b = open(dst, encoding="utf-8", errors="replace").read().splitlines(True) if os.path.exists(dst) else []
+        d = list(difflib.unified_diff(a, b, f"kit/{rel}", f"工程/{rel}"))
+        if d:
+            found = True
+            sys.stdout.writelines(d)
+    return 1 if found else 0
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="kit", description="team-kit 内核同步与一致性核对")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    for name in ("install", "sync"):
+        p = sub.add_parser(name)
+        p.add_argument("project")
+        p.add_argument("--allow-dirty", action="store_true")
+        if name == "sync":
+            p.add_argument("--force", action="store_true")
+    p = sub.add_parser("check")
+    p.add_argument("project")
+    p = sub.add_parser("diff")
+    p.add_argument("project")
+    p.add_argument("paths", nargs="*")
+    a = ap.parse_args(argv)
+    project = os.path.realpath(a.project)
+    if not os.path.isdir(project):
+        print(f"{project} 不是目录", file=sys.stderr)
+        return 2
+    if a.cmd == "check":
+        errors, _ = check(project)
+        return 1 if errors else 0
+    if a.cmd == "diff":
+        return diff(project, a.paths)
+    return apply(project, a.cmd, force=getattr(a, "force", False), allow_dirty=a.allow_dirty)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

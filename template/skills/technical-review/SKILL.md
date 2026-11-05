@@ -1,9 +1,13 @@
 ---
 name: technical-review
-description: Use when SA reviews 观澜 Vista system designs, implementation specs, implementation plans, or test designs for technical correctness.
+description: Use when SA reviews spec+plan documents or test design+case documents for technical correctness (advisory, one round). Not for system designs; SE judges implementability and PM judges requirement conformance.
 ---
 
 # 技术评审（执行者：SA）
+
+> **适用**：spec + plan 一份文档（契约 §二.3、§二.4）、测试方案 + 用例一份文档（契约 §二.4）。系统设计由 SE 判可实现性、PM 判需求符合性（契约 §二.4），SA 不用本 skill 评自己写的系统设计。
+>
+> 评增量链路的 spec + plan 时，它同时承担系统设计检查：下表「设计部分」与「spec」「plan」三行一并适用。
 
 评审范围、轮次与通过条件统一按 `docs/rules/团队协作契约.md` §五执行。本 skill 补充技术检查方法。
 
@@ -26,9 +30,9 @@ description: Use when SA reviews 观澜 Vista system designs, implementation spe
 
 | 产物 | 检查重点 |
 |---|---|
-| 系统设计 | 系统边界、数据模型、权限隔离、失败语义、依赖与可实现性 |
+| 设计部分（增量链路 spec + plan） | 系统边界、数据模型、权限隔离、失败语义、依赖与可实现性 |
 | spec | 与设计一致、接口契约、需求覆盖、关键不变量和边界行为 |
-| plan | 依赖顺序、步骤可执行、验证方法、职责与门禁一致 |
+| plan | 依赖顺序、步骤可执行、验证方法、职责归属 |
 | 测试设计 | 需求追溯、重要正反向及边界场景、测试隔离、判据能检出所声称的缺陷 |
 
 ## 结论
