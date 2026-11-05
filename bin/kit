@@ -2,8 +2,8 @@
 """team-kit：把团队基建内核同步到工程，并核对工程是否与内核一致。
 
 用法（kit 仓库内执行，<工程> 为工程根目录）：
-  bin/kit install <工程> [--allow-dirty]          首次安装：拷内核、建软链、生成工程配置模板、装钩子
-  bin/kit sync    <工程> [--force] [--allow-dirty] 同步内核到工程（工程里改过内核文件时拒绝，--force 覆盖）
+  bin/kit install <工程> [--force] [--allow-dirty] 首次安装：拷内核、建软链、生成工程专属文件模板、装钩子
+  bin/kit sync    <工程> [--force] [--allow-dirty] 同步内核到工程（工程里改过内核文件、或已有 kit 未接管过的同名文件时拒绝，--force 覆盖）
   bin/kit check   <工程>                          核对一致性；不一致退出 1
   bin/kit diff    <工程> [路径 …]                 打印工程与内核的差异
   bin/kit adopt   <工程> [路径 …] [--force]       把工程里改过的内核文件收回 kit 的 template/（不提交）
@@ -27,6 +27,7 @@ STAMP = ".team-kit.json"
 SYMLINKS = {".claude/skills": "../skills", ".codex/skills": "../skills"}
 GITIGNORE_LINE = ".team-ledger/"
 PROFILE_DOC = "docs/rules/工程配置.md"
+UI_INSTANCE_DOC = "docs/rules/UI设计规范-本工程实例.md"
 IGNORED_NAMES = {"__pycache__", ".DS_Store"}
 
 
@@ -80,6 +81,13 @@ def kit_commit():
     return head + ("+dirty" if dirty else "")
 
 
+def kit_version():
+    """最近的版本标签；标签之后还有提交时为「标签-距离-g提交」，没有标签时为提交号缩写。"""
+    v = git(KIT, "describe", "--tags", "--always").stdout.strip() or "unknown"
+    dirty = bool(git(KIT, "status", "--porcelain").stdout.strip())
+    return v + ("+dirty" if dirty else "")
+
+
 def read_stamp(project):
     p = os.path.join(project, STAMP)
     if not os.path.exists(p):
@@ -116,10 +124,11 @@ def check(project, quiet=False):
         p = os.path.join(project, link)
         if not os.path.islink(p) or os.readlink(p) != target:
             errors.append(f"软链    {link} 应指向 {target}")
+    for rel in _walk(PROFILE, "."):
+        if not os.path.exists(os.path.join(project, rel)):
+            errors.append(f"工程专属 {rel} 不存在（kit sync 会生成模板）")
     pdoc = os.path.join(project, PROFILE_DOC)
-    if not os.path.exists(pdoc):
-        errors.append(f"工程配置 {PROFILE_DOC} 不存在")
-    else:
+    if os.path.exists(pdoc):
         text = open(pdoc, encoding="utf-8").read()
         have = {l.strip() for l in text.splitlines() if l.startswith("## ")}
         for s in profile_sections():
@@ -127,8 +136,6 @@ def check(project, quiet=False):
                 errors.append(f"工程配置 缺节「{s[3:]}」（节名是内核引用的锚点）")
         if "<例" in text or "<…>" in text:
             warns.append(f"工程配置 {PROFILE_DOC} 仍有未填的模板占位")
-    if not os.path.exists(os.path.join(project, ".githooks/project.conf")):
-        errors.append("钩子配置 .githooks/project.conf 不存在")
     hp = git(project, "config", "--get", "core.hooksPath").stdout.strip()
     if hp != ".githooks":
         errors.append(f"钩子    core.hooksPath={hp or '未设置'}，应为 .githooks（执行 bash .githooks/install.sh）")
@@ -140,10 +147,11 @@ def check(project, quiet=False):
     if stamp is None:
         warns.append(f"{STAMP} 不存在（未经 kit 安装）")
     elif stamp.get("kit_commit") != kit_commit():
-        warns.append(f"{STAMP} 记录的 kit 提交 {stamp.get('kit_commit')}，当前 kit 为 {kit_commit()}")
+        warns.append(f"{STAMP} 记录的 kit 为 {stamp.get('kit_version', '?')}（{stamp.get('kit_commit')}），"
+                     f"当前 kit 为 {kit_version()}（{kit_commit()}）")
     if not quiet:
         print(f"[kit check] {project}")
-        print(f"  内核 {len(files)} 个文件，kit {kit_commit()}")
+        print(f"  内核 {len(files)} 个文件，kit {kit_version()}（{kit_commit()}）")
         for e in errors:
             print("  ✗ " + e)
         for w in warns:
@@ -164,6 +172,7 @@ def dirty_kernel_paths(project, files):
 
 def write_stamp(project, files):
     data = {
+        "kit_version": kit_version(),
         "kit_commit": kit_commit(),
         "synced_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "files": {f: sha(os.path.join(project, f)) for f in files},
@@ -186,18 +195,27 @@ def apply(project, mode, force=False, allow_dirty=False):
                 print("  " + l, file=sys.stderr)
             return 1
     stamp = read_stamp(project)
-    if mode == "sync" and not force:
+    if not force:
         recorded = (stamp or {}).get("files", {})
-        local = []
+        local, unmanaged = [], []
         for rel in files:
             dst = os.path.join(project, rel)
-            if os.path.exists(dst) and rel in recorded and sha(dst) != recorded[rel] \
-                    and sha(dst) != sha(os.path.join(TEMPLATE, rel)):
+            if not os.path.exists(dst) or sha(dst) == sha(os.path.join(TEMPLATE, rel)):
+                continue
+            if rel not in recorded:
+                unmanaged.append(rel)
+            elif sha(dst) != recorded[rel]:
                 local.append(rel)
         if local:
-            print("[kit sync] 拒绝：工程里改过这些内核文件，先把改进收回 kit（bin/kit diff 查看），或加 --force 覆盖：", file=sys.stderr)
+            print(f"[kit {mode}] 拒绝：工程里改过这些内核文件，先把改进收回 kit（bin/kit diff 查看），或加 --force 覆盖：", file=sys.stderr)
             for rel in local:
                 print("  " + rel, file=sys.stderr)
+        if unmanaged:
+            print(f"[kit {mode}] 拒绝：工程里已有这些同名文件，kit 未接管过，内容与内核不同"
+                  "（先把本工程专属内容移走、通用改进收回 kit，bin/kit diff 查看），或加 --force 覆盖：", file=sys.stderr)
+            for rel in unmanaged:
+                print("  " + rel, file=sys.stderr)
+        if local or unmanaged:
             return 1
     changed = []
     for rel in files:
@@ -243,7 +261,7 @@ def apply(project, mode, force=False, allow_dirty=False):
             print(f"[kit {mode}] 钩子安装失败：{r.stderr.strip()}", file=sys.stderr)
             return 1
     write_stamp(project, files)
-    print(f"[kit {mode}] {project}  kit {kit_commit()}")
+    print(f"[kit {mode}] {project}  kit {kit_version()}（{kit_commit()}）")
     print(f"  更新 {len(changed)} 处" + ("：" if changed else ""))
     for c in changed:
         print("    " + c)
@@ -331,8 +349,7 @@ def main(argv=None):
         p = sub.add_parser(name)
         p.add_argument("project")
         p.add_argument("--allow-dirty", action="store_true")
-        if name == "sync":
-            p.add_argument("--force", action="store_true")
+        p.add_argument("--force", action="store_true")
     p = sub.add_parser("check")
     p.add_argument("project")
     p = sub.add_parser("diff")
@@ -354,7 +371,7 @@ def main(argv=None):
         return diff(project, a.paths)
     if a.cmd == "adopt":
         return adopt(project, a.paths, force=a.force)
-    return apply(project, a.cmd, force=getattr(a, "force", False), allow_dirty=a.allow_dirty)
+    return apply(project, a.cmd, force=a.force, allow_dirty=a.allow_dirty)
 
 
 if __name__ == "__main__":

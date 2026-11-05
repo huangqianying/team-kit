@@ -227,6 +227,65 @@ def t_adopt_scope_and_guards():
         ok(os.path.exists(os.path.join(k, "template/docs/rules/roles/qa.md")) and "被删了" in out, "工程里删掉的内核文件不在 kit 里删，只提示")
         shutil.rmtree(d)
 
+def t_check_all_profile_files_required():
+    d = new_repo()
+    run("install", d)
+    profile_files = kit._walk(kit.PROFILE, ".")
+    ok(all(os.path.exists(os.path.join(d, f)) for f in profile_files), "install 生成全部工程专属文件模板")
+    os.remove(os.path.join(d, kit.UI_INSTANCE_DOC))
+    errors, _ = kit.check(d, quiet=True)
+    ok(any(kit.UI_INSTANCE_DOC in e and "不存在" in e for e in errors), "缺 UI 设计规范本工程实例时 check 报错")
+    shutil.rmtree(d)
+
+
+def t_sync_refuses_overwriting_unmanaged_file():
+    d = new_repo()
+    run("install", d)
+    commit_all(d)
+    p = os.path.join(d, "AGENTS.md")
+    open(p, "a", encoding="utf-8").write("\n工程原有的同名文件内容\n")
+    stamp_path = os.path.join(d, kit.STAMP)
+    import json
+    data = json.load(open(stamp_path, encoding="utf-8"))
+    del data["files"]["AGENTS.md"]          # 模拟：该文件是内核新增的，kit 从没接管过
+    json.dump(data, open(stamp_path, "w", encoding="utf-8"))
+    commit_all(d)
+    rc, out = run("sync", d)
+    ok(rc == 1 and "AGENTS.md" in out and "未接管" in out, "工程里已有同名文件且 kit 未接管过时 sync 拒绝并点名")
+    ok("工程原有的同名文件内容" in open(p, encoding="utf-8").read(), "拒绝时不覆盖工程原有文件")
+    rc, _ = run("sync", d, "--force")
+    ok(rc == 0 and kit.check(d, quiet=True)[0] == [], "--force 明确覆盖后与内核一致")
+    shutil.rmtree(d)
+
+
+def t_install_refuses_existing_kernel_named_file():
+    d = new_repo()
+    open(os.path.join(d, "CLAUDE.md"), "w", encoding="utf-8").write("工程自己的 CLAUDE.md\n")
+    commit_all(d)
+    rc, out = run("install", d)
+    ok(rc == 1 and "CLAUDE.md" in out, "install 遇到工程已有的同名文件时拒绝")
+    rc, _ = run("install", d, "--force")
+    ok(rc == 0, "install --force 明确覆盖")
+    shutil.rmtree(d)
+
+
+def t_version_recorded_and_shown():
+    with temp_kit() as k:
+        subprocess.run(["git", "-C", k, "tag", "-a", "v9.8.7", "-m", "t"], check=True)
+        d = new_repo()
+        rc, out = run("install", d)
+        import json
+        stamp = json.load(open(os.path.join(d, kit.STAMP), encoding="utf-8"))
+        ok(stamp.get("kit_version") == "v9.8.7", f"stamp 记录 kit 版本号（{stamp.get('kit_version')}）")
+        ok("v9.8.7" in out, "install 输出版本号")
+        rc, out = run("check", d)
+        ok("v9.8.7" in out, "check 输出版本号")
+        open(os.path.join(k, "template/AGENTS.md"), "a", encoding="utf-8").write("\n新\n")
+        commit_all(k)
+        ok(kit.kit_version().startswith("v9.8.7-1-g"), f"标签之后的提交显示为「标签-距离-提交」（{kit.kit_version()}）")
+        shutil.rmtree(d)
+
+
 if __name__ == "__main__":
     for name, fn in sorted((k, v) for k, v in globals().items() if k.startswith("t_")):
         print(name)
