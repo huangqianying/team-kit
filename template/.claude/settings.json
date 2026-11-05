@@ -1,0 +1,20 @@
+{
+  "skipWorkflowUsageWarning": true,
+  "permissions": {
+    "defaultMode": "bypassPermissions",
+    "allow": [
+      "Task",
+      "Agent",
+      "Bash(*)",
+      "Read",
+      "Read(//Users/hqy/Documents/AIWorkspace/DeptTracker/**)",
+      "Edit",
+      "Edit(//Users/hqy/Documents/AIWorkspace/DeptTracker/**)",
+      "Write",
+      "Write(//Users/hqy/Documents/AIWorkspace/DeptTracker/**)",
+      "MultiEdit",
+      "MultiEdit(//Users/hqy/Documents/AIWorkspace/DeptTracker/**)"
+    ],
+    "deny": []
+  }
+}
