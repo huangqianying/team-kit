@@ -286,6 +286,49 @@ def t_version_recorded_and_shown():
         shutil.rmtree(d)
 
 
+def t_check_warns_unfilled_ui_instance():
+    d = new_repo()
+    run("install", d)
+    _, warns = kit.check(d, quiet=True)
+    ok(any(kit.UI_INSTANCE_DOC in w and "占位" in w for w in warns), "UI 设计规范本工程实例未填时给出提醒")
+    p = os.path.join(d, kit.UI_INSTANCE_DOC)
+    s = "\n".join(l for l in open(p, encoding="utf-8").read().splitlines() if not l.strip().startswith("<"))
+    open(p, "w", encoding="utf-8").write(s + "\n")
+    _, warns = kit.check(d, quiet=True)
+    ok(not any(kit.UI_INSTANCE_DOC in w for w in warns), "占位全部替换后不再提醒")
+    shutil.rmtree(d)
+
+
+def t_demo_breakpoints_match_spec():
+    import re
+    spec = open(os.path.join(kit.TEMPLATE, "docs/rules/UI设计规范.md"), encoding="utf-8").read()
+    sec = spec[spec.index("### 4.1"):spec.index("## 5.")]
+    allowed = {int(x) for x in re.findall(r"@media \(width\s*[<>]=?\s*(\d+)px\)", sec)}
+    ok(allowed == {768, 1180, 1440, 2560}, f"规范 §4.1 的断点阶为 768/1180/1440/2560（{sorted(allowed)}）")
+    widths = lambda text: {int(x) for q in re.findall(r"@media\s*\(([^)]*)\)", text) for x in re.findall(r"(\d+)px", q)}
+    demo = open(os.path.join(kit.TEMPLATE, "docs/rules/ui-demo.html"), encoding="utf-8").read()
+    ok(widths(demo) <= allowed, f"演示页的 @media 断点都在 §4.1 断点阶内（多出 {sorted(widths(demo) - allowed)}）")
+    ok(widths(spec) <= allowed, f"规范正文示例里的 @media 断点都在 §4.1 断点阶内（多出 {sorted(widths(spec) - allowed)}）")
+
+
+def t_adopt_three_way_merges_disjoint_edits():
+    with temp_kit() as k:
+        d = new_repo()
+        run("install", d)
+        commit_all(d)
+        t = os.path.join(k, "template/CLAUDE.md")
+        orig = open(t, encoding="utf-8").read()
+        open(t, "w", encoding="utf-8").write("kit 在开头加的一行\n" + orig)
+        commit_all(k)
+        with open(os.path.join(d, "CLAUDE.md"), "a", encoding="utf-8") as f:
+            f.write("\n工程在结尾加的一行\n")
+        rc, out = run("adopt", d)
+        merged = open(t, encoding="utf-8").read()
+        ok(rc == 0 and "合并" in out, f"kit 与工程改了同一文件的不同处：三方合并收回（rc={rc}）")
+        ok("kit 在开头加的一行" in merged and "工程在结尾加的一行" in merged, "合并结果同时保留两边的改动")
+        shutil.rmtree(d)
+
+
 if __name__ == "__main__":
     for name, fn in sorted((k, v) for k, v in globals().items() if k.startswith("t_")):
         print(name)

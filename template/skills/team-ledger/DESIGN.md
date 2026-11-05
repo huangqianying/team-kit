@@ -57,7 +57,7 @@ PM / UI / SE / QA 是 SA 值守会话的 **subagent**：任务由 SA 直接派�
 | `version` | 自动 | 取自 `system-version.json`；`--version` 可显式覆盖；读不到为 `_infra` |
 | `role` | 是 | 枚举：`pm` / `ui` / `sa` / `se` / `qa` |
 | `item` | 是 | 工作项短标识；同一工作项跨状态**保持同名**。同一 `role` 内，大小写 / 空格 / 连字符 / 下划线 / 全角差异视为同事异名、硬拒并提示既有原名；确属另起一项加 `--force-new-item` 并在 `--note` 写明理由 |
-| `phase` | 否 | 枚举（标注链路环节）：`requirement` / `design` / `ui-design` / `ui-proto` / `spec` / `plan` / `dev` / `ui-review` / `test-design` / `test-case` / `test` / `accept` / `review` / `deploy`（中文门名自动归一）。`ui-proto` 是 UI Web 原型；`ui-design` 为兼容存量行保留 |
+| `phase` | 否 | 枚举（标注链路环节）：`requirement` / `design` / `ui-design` / `ui-proto` / `spec` / `plan` / `dev` / `ui-review` / `test-design` / `test-case` / `test` / `accept` / `review` / `deploy`（中文门名自动归一）。`ui-proto` 是 UI Web 原型（「UI设计」「界面设计」「原型」等中文门名都归到它）；`ui-design` 为兼容存量行保留，须显式写 slug |
 | `status` | 是 | 枚举：`进行中` / `待评审` / `评审中` / `阻塞` / `完成` / `交接`。终态 = `完成` / `交接` |
 | `to` | 条件 | 接续方角色；`status=交接` / `待评审` 时**必填** |
 | `blocker_role` | 条件 | 被卡方角色；`status=阻塞` 时**必填**。等产品负责人裁定写 `owner`，进待裁决清单 |

@@ -119,6 +119,17 @@ kernel_reminder()
 # 测试文件与 .example 跳过内容扫描：夹具本就该带假口令，逐个加白名单是打地鼠。
 # 代价（如实说）：真凭据藏进测试文件不会被本门拦住；凭据文件名的拦截（A1）不受此豁免。
 KEY = re.compile(r"(password|passwd|secret_key|api_key|token)\b\s*[=:]\s*", re.I)
+# 带引号的键（JSON / 字典 / JS 对象里的 "password": "…"）：键必须是完整的引号串、紧跟冒号，
+# 且出现在对象键的位置（行首、空白、{ , ( [ 之后）。三元运算的 ? "A_PASSWORD" : "B" 不是键值对，跳过；
+# HTML 属性 v-model="password" :type 的引号前是 =，不在键位置。
+QKEY = re.compile(r"(?:^|(?<=[{,(\[\s]))[\x27\"][\w.-]*(password|passwd|secret_key|api_key|token)[\x27\"]\s*:\s*", re.I)
+
+def key_matches(text):
+    for m in KEY.finditer(text):
+        yield m
+    for m in QKEY.finditer(text):
+        if not text[:m.start()].rstrip().endswith("?"):
+            yield m
 
 def literal_res(backtick):
     # 带引号的字面量；反斜杠转义的引号留在值里，藏不住后缀。
@@ -134,9 +145,13 @@ EXPANSION = re.compile(r"\$[({]")
 VUE_DYNAMIC = re.compile(r"(?:^|[\s<])(?:[:@#]|v-[\w-]+:)(?:[\w-]+:)?$")
 VUE_ATTR = re.compile(r"\"([^\"]*)\"|\x27([^\x27]*)\x27")
 DUMMY = {"secret", "dummy", "fake", "test", "testing", "example", "password", "pass", "none", "null"}
+# 脱敏后的证据值（[REDACTED] 等）不是口令
+REDACTED = re.compile(r"^\[(redacted|masked|hidden|removed|filtered|omitted)\]$", re.I)
 # 变量与命令展开、格式占位、<占位>、***、...、xxx 等都不是字面口令
 PLACEHOLDER = re.compile(r"^[\x27\"]?(\$[\w{(@*#?!-]|%|<|\*{3,}|\.{3}|xxx|placeholder|changeme|your[-_]?)", re.I)
 TESTPATH = re.compile(r"(^|/)tests?/|\.test\.|\.spec\.|(^|/)test_|_test\.", re.I)
+# docs/ 下是文档（测试方案、报告、证据），不是测试代码：docs/tests/ 不享受测试豁免。
+DOCSPATH = re.compile(r"(^|/)docs/", re.I)
 CONFIGPATH = re.compile(r"(^|/)\.env(\.|$)|(^|/)\.(npmrc|pypirc|netrc)$|(^|/)Dockerfile(\.[\w-]+)?$"
                         r"|\.(env|ini|cfg|cnf|conf|properties|toml|ya?ml|sh|bash)$", re.I)
 
@@ -149,6 +164,8 @@ def looks_secret(val):
     if not val.strip() or PLACEHOLDER.match(val) or EXPANSION.search(val):
         return False
     if not val.isascii() or len(val) < 4 or val.lower() in DUMMY:
+        return False
+    if REDACTED.match(val) or re.sub(r"[^a-z0-9]", "", val.lower()) in DUMMY:   # 如 #password、<password>
         return False
     if ALLOW_VALUE and ALLOW_VALUE.fullmatch(val):
         return False
@@ -193,7 +210,7 @@ for line in diff.splitlines():
     if header:
         if line.startswith("+++ "):                 # 新文件段：判这个文件扫不扫、按哪类扫
             path = unquote(line[4:].strip())
-            skip = bool(TESTPATH.search(path) or (TEST_EXTRA and TEST_EXTRA.search(path)))
+            skip = bool((TESTPATH.search(path) and not DOCSPATH.search(path)) or (TEST_EXTRA and TEST_EXTRA.search(path)))
             kind = kind_of(path)
         elif line.startswith("@@"):
             header = False
@@ -202,7 +219,7 @@ for line in diff.splitlines():
         continue
     text = line[1:]
     # 一行可能同时有空字段与真实口令，须逐字段扫描。
-    for m in KEY.finditer(text):
+    for m in key_matches(text):
         val = value_of(text, m, kind)
         if val is not None and looks_secret(val):
             hits.append(f"{path}: {text.strip()[:160]}")

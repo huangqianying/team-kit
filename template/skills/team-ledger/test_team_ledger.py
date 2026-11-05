@@ -270,11 +270,44 @@ def t_no_md(tmp):
     check("不再渲染 ledger.md", not os.path.exists(os.path.join(tmp, "ledger.md")))
 
 
+def t_ui_phase_alias(tmp):
+    env = mkenv(tmp)
+    for i, name in enumerate(["UI设计", "界面设计", "UI原型", "原型"]):
+        r = append(env, role="ui", item=f"p{i}", status="进行中", phase=name)
+        check(f"「{name}」落账成功", r.returncode == 0, out(r))
+    got = [e.get("phase") for e in events(tmp)]
+    check("UI 的中文门名归一到现行的 ui-proto（ui-design 只为兼容存量行）",
+          got == ["ui-proto"] * 4, str(got))
+    r = append(env, role="ui", item="legacy", status="进行中", phase="ui-design")
+    check("显式写 ui-design 仍可落账（兼容存量）", r.returncode == 0 and events(tmp)[-1].get("phase") == "ui-design", out(r))
+
+
+def t_utc_offset(tmp):
+    from datetime import datetime, timedelta, timezone
+    env = mkenv(tmp)
+    env["TEAM_LEDGER_UTC_OFFSET"] = "0"
+    r = append(env, role="se", item="tz", status="进行中")
+    check("设 UTC 偏移后落账成功", r.returncode == 0, out(r))
+    ts = events(tmp)[-1].get("ts", "")
+    utc_now = datetime.now(timezone.utc)
+    want = {(utc_now + timedelta(minutes=d)).strftime("%Y-%m-%d %H:%M") for d in (-1, 0, 1)}
+    check("TEAM_LEDGER_UTC_OFFSET=0 时按 UTC 记时间", ts in want, f"{ts} not in {sorted(want)}")
+    env2 = mkenv(tmp)
+    r = run(env2, "stale", "--hours", "0")
+    check("默认仍按 UTC+8 解读存量时间：刚记的 UTC 时间看起来是 8 小时前",
+          "8.0h" in out(r) or "7.9h" in out(r) or "8.1h" in out(r), out(r))
+    env3 = mkenv(tmp)
+    env3["TEAM_LEDGER_UTC_OFFSET"] = "abc"
+    r = append(env3, role="se", item="tz2", status="进行中")
+    check("偏移值不合法时硬拒、不落账", r.returncode != 0 and len(events(tmp)) == 1, out(r))
+
+
 ALL = [t_append, t_version_missing, t_reject, t_successor_required, t_owner_successor,
        t_item_clash, t_item_clash_scope, t_force_new_item,
        t_stale_quiet, t_stale_hours0, t_stale_owner_tag, t_stale_bad_ts, t_bad_line,
        t_owner, t_owner_closed, t_concurrent,
-       t_removed_subcommands, t_removed_anchor_flags, t_no_md]
+       t_removed_subcommands, t_removed_anchor_flags, t_no_md,
+       t_ui_phase_alias, t_utc_offset]
 
 
 def main():

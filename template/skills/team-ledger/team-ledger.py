@@ -48,7 +48,9 @@ INFRA_VERSION = "_infra"
 PHASE_ALIAS = {
     "需求": "requirement",
     "设计": "design", "系统设计": "design",
-    "UI设计": "ui-design", "ui设计": "ui-design", "界面设计": "ui-design",
+    # UI 的中文门名一律归到现行的 ui-proto（UI 只做 Web 原型）；ui-design 只为兼容存量行，须显式写 slug
+    "UI设计": "ui-proto", "ui设计": "ui-proto", "界面设计": "ui-proto",
+    "UI原型": "ui-proto", "ui原型": "ui-proto", "原型": "ui-proto",
     "UI走查": "ui-review", "ui走查": "ui-review", "界面走查": "ui-review",
     "测试设计": "test-design",
     "用例": "test-case", "测试用例": "test-case",
@@ -101,7 +103,21 @@ LOCK = os.path.join(LEDGER_DIR, "ledger.lock")
 SYSVER = os.environ.get("TEAM_LEDGER_SYSTEM_VERSION") or os.path.join(
     LEDGER_DIR if os.environ.get("TEAM_LEDGER_DIR") else _LEDGER_ROOT, "system-version.json")
 
-CST = timezone(timedelta(hours=8))
+# 账本 ts 是不带时区的本地时间字符串，统一按一个固定 UTC 偏移写和读。
+# 默认 UTC+8；工程不在东八区时设 TEAM_LEDGER_UTC_OFFSET（小时，可带小数，如 0 / -5 / 5.5）。
+# 注意：改偏移会改变**存量行**的解读（停滞时长整体平移），一个账本从头到尾只用一个偏移。
+def _ledger_tz():
+    raw = os.environ.get("TEAM_LEDGER_UTC_OFFSET", "8")
+    try:
+        hours = float(raw)
+    except ValueError:
+        hours = None
+    if hours is None or not -12 <= hours <= 14:
+        sys.exit(f"[team-ledger] TEAM_LEDGER_UTC_OFFSET 不合法：{raw!r}（须是 -12 到 14 之间的小时数）")
+    return timezone(timedelta(hours=hours))
+
+
+CST = _ledger_tz()
 
 
 def _now():

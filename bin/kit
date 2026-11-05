@@ -136,6 +136,15 @@ def check(project, quiet=False):
                 errors.append(f"工程配置 缺节「{s[3:]}」（节名是内核引用的锚点）")
         if "<例" in text or "<…>" in text:
             warns.append(f"工程配置 {PROFILE_DOC} 仍有未填的模板占位")
+    # 其余工程专属文件：模板里整行是 <…> 的占位，原样留在工程里 ⇒ 还没填
+    for rel in _walk(PROFILE, "."):
+        dst = os.path.join(project, rel)
+        if rel == PROFILE_DOC or not os.path.exists(dst) or not rel.endswith(".md"):
+            continue
+        holders = {l.strip() for l in open(os.path.join(PROFILE, rel), encoding="utf-8")
+                   if l.strip().startswith("<") and l.strip().endswith(">")}
+        if holders & {l.strip() for l in open(dst, encoding="utf-8")}:
+            warns.append(f"工程专属 {rel} 仍有未填的模板占位")
     hp = git(project, "config", "--get", "core.hooksPath").stdout.strip()
     if hp != ".githooks":
         errors.append(f"钩子    core.hooksPath={hp or '未设置'}，应为 .githooks（执行 bash .githooks/install.sh）")
@@ -271,11 +280,31 @@ def apply(project, mode, force=False, allow_dirty=False):
     return 0
 
 
+def merge3(base_commit, rel, ours_path, theirs_path):
+    """三方合并：base = 该工程上次同步时 kit 的那一版，ours = kit 现在的 template，theirs = 工程里的。
+    返回合并后的字节；取不到基线或有冲突时返回 None。"""
+    if not base_commit or base_commit.endswith("+dirty"):
+        return None
+    b = subprocess.run(["git", "-C", KIT, "show", f"{base_commit}:template/{rel}"], capture_output=True)
+    if b.returncode != 0:
+        return None
+    import tempfile
+    with tempfile.NamedTemporaryFile(delete=False) as f:
+        f.write(b.stdout)
+        base_path = f.name
+    try:
+        r = subprocess.run(["git", "merge-file", "-p", ours_path, base_path, theirs_path], capture_output=True)
+    finally:
+        os.unlink(base_path)
+    return r.stdout if r.returncode == 0 else None
+
+
 def adopt(project, paths, force=False):
     """把工程里改过（或在内核目录里新增）的内核文件拷回 template/。
 
-    保护：kit 在该工程上次同步之后自己又改过同一文件（template 摘要 ≠ .team-kit.json 记录）时，
-    直接拷回会冲掉 kit 的新改动 —— 拒绝该文件，要求人工合并；--force 明确覆盖。
+    kit 在该工程上次同步之后自己也改过同一文件（template 摘要 ≠ .team-kit.json 记录）时，直接拷回会冲掉
+    kit 的新改动：先以上次同步时的 kit 版本为基线做三方合并，两边改的不是同一处就合并收回；
+    有冲突（或取不到基线）则拒绝该文件，要求人工合并；--force 明确用工程版覆盖。
     """
     files, dirs = kernel_files()
     tset = set(files)
@@ -295,8 +324,9 @@ def adopt(project, paths, force=False):
         print("[kit adopt] 拒绝：kit 的 template/ 里这些文件有未提交改动，先在 kit 提交或处理：", file=sys.stderr)
         print("  " + dirty.replace("\n", "\n  "), file=sys.stderr)
         return 1
-    recorded = (read_stamp(project) or {}).get("files", {})
-    adopted, conflicts, missing = [], [], []
+    stamp = read_stamp(project) or {}
+    recorded = stamp.get("files", {})
+    adopted, merged, conflicts, missing = [], [], [], []
     for rel in candidates:
         src, dst = os.path.join(project, rel), os.path.join(TEMPLATE, rel)
         if not os.path.exists(src):
@@ -306,7 +336,13 @@ def adopt(project, paths, force=False):
         if os.path.exists(dst) and sha(src) == sha(dst) and is_exec(src) == is_exec(dst):
             continue
         if os.path.exists(dst) and rel in recorded and sha(dst) != recorded[rel] and not force:
-            conflicts.append(rel)
+            out = merge3(stamp.get("kit_commit"), rel, dst, src)
+            if out is None:
+                conflicts.append(rel)
+            else:
+                with open(dst, "wb") as f:
+                    f.write(out)
+                merged.append(rel)
             continue
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copy2(src, dst)
@@ -314,15 +350,18 @@ def adopt(project, paths, force=False):
     print(f"[kit adopt] {project} → {TEMPLATE}")
     for rel in adopted:
         print("  收回  " + rel)
+    for rel in merged:
+        print("  合并  " + rel + "（kit 与工程改的不是同一处，已三方合并；请核对合并结果）")
     for rel in missing:
         print(f"  ! {rel} 在工程里被删了；adopt 不删 kit 里的文件，确要删请在 kit 里手工删并改 MANIFEST")
     if conflicts:
-        print("  ✗ 下列文件在该工程上次同步后 kit 也改过，未收回（bin/kit diff 对照后人工合并，或 --force 覆盖）：")
+        print("  ✗ 下列文件在该工程上次同步后 kit 也改过，且两边改到了同一处（或取不到同步时的基线），未收回"
+              "（bin/kit diff 对照后人工合并，或 --force 用工程版覆盖）：")
         for rel in conflicts:
             print("    " + rel)
-    if not adopted and not conflicts and not missing:
+    if not adopted and not merged and not conflicts and not missing:
         print("  工程与内核一致，没有可收回的改动")
-    if adopted:
+    if adopted or merged:
         print("  下一步：在 kit 跑三套测试 → 提交 kit → 对每个工程 bin/kit sync → 各工程提交")
     return 1 if conflicts else 0
 
