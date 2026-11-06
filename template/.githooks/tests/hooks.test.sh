@@ -122,6 +122,15 @@ ok "选择器值 \"loginPassword\": \"#password\" → 放行" "$(allows qa/evide
 ok "shell 里 sed 表达式中的 \"csrfToken\": → 放行" "$(allows server/verify.sh "nonce=\$(sed -n 's/.*\"csrfToken\":\"\\([^\"]*\\)\".*/\\1/p' \"\$WORK/b\")" 'test: sed')" "yes"
 ok "代码目录里的 tests/ 仍豁免" "$(allows backend/tests/conftest.py "PASSWORD = 'fixture-password-123'; cfg = {'password': 'fixture-password-123'}" 'test: fixture')" "yes"
 
+echo "[同一工作树并行：带路径提交只带走、只扫自己的路径]"
+setup_repo
+printf 'password = "RealSecret123"\n' > "${R}/other-line.py"; git -C "${R}" add other-line.py     # 另一条线已暂存、未提交
+echo "mine" > "${R}/mine.txt"; git -C "${R}" add -- mine.txt
+git -C "${R}" commit -m "mine" -- mine.txt >"${TMP}/last.out" 2>&1
+ok "带路径提交：不被别人暂存区里的内容拦住" "$(verdict_of_last $?)" "allow"
+ok "带路径提交：提交里只有自己的路径" "$(git -C "${R}" show --name-only --format= HEAD | tr '\n' ' ')" "mine.txt "
+ok "带路径提交：别人暂存的内容原样留在暂存区" "$(git -C "${R}" diff --cached --name-only | tr '\n' ' ')" "other-line.py "
+
 echo "[A2 标识符、表达式与 spec 夹具不得误报]"
 ok "phaseToken 复合标识符 → 放行" "$(allows src/phase.ts 'const phaseToken: AdvisoryLockPhaseToken = value;' 'test: phase token identifier')" "yes"
 ok "token 类型标识符 → 放行" "$(allows src/token.ts 'token: AdvisoryLockPhaseToken,' 'test: token type')" "yes"

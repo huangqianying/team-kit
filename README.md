@@ -43,7 +43,7 @@ bin/kit adopt /path/to/project [路径 …] [--force]
 
 1. 在 kit 的 `template/` 里改，跑 `python3 bin/test_kit.py`、`python3 template/skills/team-ledger/test_team_ledger.py`、`bash template/.githooks/tests/hooks.test.sh`。
 2. 在 kit 提交，打版本标签（见下），推送提交与标签。
-3. 对每个工程 `bin/kit sync <工程>`，在工程里提交（含 `.team-kit.json`）。
+3. 对每个工程 `bin/kit sync <工程>`，在工程里**带路径**提交（`sync` 会打印现成的 `git commit -m "…" -- <路径>` 命令；同一工作树里可能有别人暂存的改动，不带路径会一并提交走）。
 4. `bin/kit check <工程>` 退出 0。
 
 ## 版本

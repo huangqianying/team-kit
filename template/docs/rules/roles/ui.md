@@ -62,6 +62,7 @@
 
 - 提交前 `git status --porcelain`，**只 `git add` 自己产出的路径**（你的 ＝ 当前版本的 `prototypes/<版本>/` ＋ `prototypes/README.md` ＋ 你自己那一份记录）。
   **禁 `git add -A` / `git add .` / `git commit -a`；禁 `git stash`。**
+- **提交一律带路径**：`git commit -m "…" -- <你这次的全部路径>`（新文件先 `git add`，改名新旧路径都写），提交后 `git show --stat HEAD` 核对只有自己的路径（`AGENTS.md`「多角色同 worktree 下的提交纪律」）。
 - **回退未提交改动用「备份 ＋ `cp` 回 ＋ 核 md5」，不用 `git checkout -- <file>`。**
 - **dev server 若已在跑，不要 kill、不要另起一个**；端口冲突报出来。
 

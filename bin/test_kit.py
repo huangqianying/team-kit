@@ -133,6 +133,10 @@ def t_profile_not_overwritten():
     commit_all(d)
     run("sync", d)
     ok("本工程自填内容" in open(p, encoding="utf-8").read(), "sync 不覆盖工程配置")
+    open(os.path.join(d, "AGENTS.md"), "a", encoding="utf-8").write("\n私改\n")
+    commit_all(d)
+    rc, out = run("sync", d, "--force")
+    ok(rc == 0 and 'commit -m "<提交信息>" -- .team-kit.json AGENTS.md' in out, "sync 打印带路径的提交命令（只含本次同步动到的路径）")
     shutil.rmtree(d)
 
 

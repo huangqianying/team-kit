@@ -287,7 +287,11 @@ def apply(project, mode, force=False, allow_dirty=False):
         print("    " + c)
     for c in created:
         print(f"  新建工程专属文件 {c}（请按本工程填写，kit 之后不再覆盖）")
-    print("  未提交：请在工程里核对后自行提交（含 .team-kit.json）")
+    print("  未提交：请在工程里核对后自行提交（含 .team-kit.json）。同一工作树里可能有别人暂存的改动，提交一律带路径：")
+    paths = [STAMP] + [c for c in changed if c != STAMP] + created
+    print(f'    git -C {project} commit -m "<提交信息>" -- ' + " ".join(paths))
+    if created:
+        print("    （新建的工程专属文件须先 git add 再提交）")
     return 0
 
 
