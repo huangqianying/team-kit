@@ -88,6 +88,17 @@ def kit_version():
     return v + ("+dirty" if dirty else "")
 
 
+def kernel_changed_since(commit):
+    """工程上次同步之后，kit 里会进工程的东西（template/、profile/、MANIFEST）有没有变。
+    只改 kit 自己的文档、工具或测试不算——工程无须 sync。判不了（提交号缺失、带 +dirty、kit 里找不到）按「变了」报。"""
+    if not commit or commit.endswith("+dirty"):
+        return True
+    r = git(KIT, "diff", "--quiet", commit, "--", "template", "profile", "MANIFEST")
+    if r.returncode != 0:          # 1 = 有差异；其他 = 判不了
+        return True
+    return bool(git(KIT, "status", "--porcelain", "--", "template", "profile", "MANIFEST").stdout.strip())
+
+
 def read_stamp(project):
     p = os.path.join(project, STAMP)
     if not os.path.exists(p):
@@ -155,9 +166,9 @@ def check(project, quiet=False):
     stamp = read_stamp(project)
     if stamp is None:
         warns.append(f"{STAMP} 不存在（未经 kit 安装）")
-    elif stamp.get("kit_commit") != kit_commit():
+    elif stamp.get("kit_commit") != kit_commit() and kernel_changed_since(stamp.get("kit_commit")):
         warns.append(f"{STAMP} 记录的 kit 为 {stamp.get('kit_version', '?')}（{stamp.get('kit_commit')}），"
-                     f"当前 kit 为 {kit_version()}（{kit_commit()}）")
+                     f"当前 kit 为 {kit_version()}（{kit_commit()}）：内核有更新，该工程待 sync")
     if not quiet:
         print(f"[kit check] {project}")
         print(f"  内核 {len(files)} 个文件，kit {kit_version()}（{kit_commit()}）")

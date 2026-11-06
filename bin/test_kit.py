@@ -329,6 +329,23 @@ def t_adopt_three_way_merges_disjoint_edits():
         shutil.rmtree(d)
 
 
+def t_check_quiet_when_only_kit_docs_changed():
+    with temp_kit() as k:
+        d = new_repo()
+        run("install", d)
+        commit_all(d)
+        os.makedirs(os.path.join(k, "docs"), exist_ok=True)
+        open(os.path.join(k, "docs/说明.md"), "w", encoding="utf-8").write("只改 kit 自己的文档\n")
+        commit_all(k)
+        _, warns = kit.check(d, quiet=True)
+        ok(not any(kit.STAMP in w for w in warns), f"kit 只改了内核以外的文件：不提醒版本落后（{warns}）")
+        open(os.path.join(k, "template/AGENTS.md"), "a", encoding="utf-8").write("\n内核改动\n")
+        commit_all(k)
+        _, warns = kit.check(d, quiet=True)
+        ok(any(kit.STAMP in w and "内核有更新" in w for w in warns), "内核有改动：提醒工程该 sync 了")
+        shutil.rmtree(d)
+
+
 if __name__ == "__main__":
     for name, fn in sorted((k, v) for k, v in globals().items() if k.startswith("t_")):
         print(name)
