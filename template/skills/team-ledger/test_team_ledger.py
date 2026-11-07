@@ -302,12 +302,60 @@ def t_utc_offset(tmp):
     check("偏移值不合法时硬拒、不落账", r.returncode != 0 and len(events(tmp)) == 1, out(r))
 
 
+# ───────────────────────── 收口与子产物 ─────────────────────────
+
+def t_handoff_does_not_fold(tmp):
+    """反向判据：主线进行中 ＋ 另一角色在同一工作项上落「交接」，主线仍须出现在 stale 里。"""
+    env = mkenv(tmp)
+    append(env, role="se", item="I5", status="进行中")
+    append(env, role="pm", item="I5", status="交接", to="se", note="澄清完了交回 SE")
+    r = run(env, "stale", "--hours", "0")
+    check("交接不折叠整项：主线 SE 的「进行中」仍在 stale 里",
+          r.returncode == 1 and " se " in out(r) and "I5" in out(r) and "已收口" not in out(r), out(r))
+
+
+def t_complete_still_folds(tmp):
+    env = mkenv(tmp)
+    append(env, role="se", item="Y", status="待评审", to="sa")
+    append(env, role="sa", item="Y", status="完成", decision="APPROVED")
+    r = run(env, "stale", "--hours", "0")
+    check("「完成」仍让整项收口：被评方停在待评审的那行折叠", r.returncode == 0 and "已收口" in out(r), out(r))
+
+
+def t_part_rows(tmp):
+    env = mkenv(tmp)
+    append(env, role="se", item="I5", status="进行中")
+    r = append(env, role="pm", item="I5", part="澄清A", status="进行中")
+    check("--part 落账成功并记下 part 字段", r.returncode == 0 and events(tmp)[-1].get("part") == "澄清A", out(r))
+    r = run(env, "stale", "--hours", "0")
+    check("子产物单独成行，显示为「工作项/子产物」", "I5/澄清A" in out(r) and "2 非终态项" in out(r), out(r))
+    append(env, role="pm", item="I5", part="澄清A", status="完成")
+    r = run(env, "stale", "--hours", "0")
+    check("子产物「完成」只收它自己那一行，主线照常可见",
+          "I5/澄清A" not in out(r) and "1 非终态项" in out(r) and "已收口" not in out(r), out(r))
+    append(env, role="ui", item="I5", part="图标", status="进行中")
+    append(env, role="se", item="I5", status="完成")
+    r = run(env, "stale", "--hours", "0")
+    check("主线「完成」：整项收口，没人回来置终态的子产物行一并折叠",
+          r.returncode == 0 and "已收口" in out(r), out(r))
+
+
+def t_part_owner_and_validation(tmp):
+    env = mkenv(tmp)
+    r = append(env, role="ui", item="I6", part="  ", status="进行中")
+    check("--part 为空白时硬拒、不落账", r.returncode != 0 and not events(tmp), out(r))
+    append(env, role="ui", item="I6", part="配色", status="阻塞", blocker_role="owner", blocker="等定色")
+    r = run(env, "owner")
+    check("待裁决清单按「工作项/子产物」列出", r.returncode == 1 and "I6/配色" in out(r), out(r))
+
+
 ALL = [t_append, t_version_missing, t_reject, t_successor_required, t_owner_successor,
        t_item_clash, t_item_clash_scope, t_force_new_item,
        t_stale_quiet, t_stale_hours0, t_stale_owner_tag, t_stale_bad_ts, t_bad_line,
        t_owner, t_owner_closed, t_concurrent,
        t_removed_subcommands, t_removed_anchor_flags, t_no_md,
-       t_ui_phase_alias, t_utc_offset]
+       t_ui_phase_alias, t_utc_offset,
+       t_handoff_does_not_fold, t_complete_still_folds, t_part_rows, t_part_owner_and_validation]
 
 
 def main():

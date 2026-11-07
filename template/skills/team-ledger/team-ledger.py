@@ -37,6 +37,9 @@ PHASES = {"requirement", "design", "ui-design", "ui-proto", "spec", "plan",
 # ui-design：存量账本行可能锚在它上面，保留以兼容，不要删。
 DECISIONS = {"APPROVED", "CR"}
 TERMINAL = {"完成", "交接"}
+# 能让整个工作项收口的只有「完成」：「交接」只是一棒传了出去，整件事未必结束
+# （如 PM 澄清完交回、主线 SE 仍在跑）。按「交接」收口会把主线的「进行中」一并折叠掉。
+ITEM_CLOSING = {"完成"}
 # 「球在别人半场」的状态：落账只记接续方、不派活，棒由 SA 读账本后主动派出——
 # 不指定接续方，SA 就看不出这一棒该给谁，等于掉棒。
 PENDING_STATUSES = {"交接", "待评审", "阻塞"}
@@ -163,25 +166,31 @@ def _read_events():
 
 
 def _current(events):
-    """每个 (role,item) 取最新事件 = 当前态。"""
+    """每个 (role, item, part) 取最新事件 = 当前态；没有 part 的是主线，part 为空串。"""
     latest = {}
     for e in events:
-        latest[(e.get("role"), e.get("item"))] = e
+        latest[(e.get("role"), e.get("item"), e.get("part") or "")] = e
     return latest
 
 
-def _closed_items(events):
-    """已收口的工作项：该 item 的**最新一条**事件为终态。
+def _label(item, part):
+    """显示名：子产物行显示为「工作项/子产物」。"""
+    return f"{item}/{part}" if part else item
 
-    收口语义落在 item 上，不落在行上 —— 行按 `(role, item)` 独立存活，而「完成」通常
+
+def _closed_items(events):
+    """已收口的工作项：该 item **主线**的最新一条事件为「完成」。
+
+    收口语义落在 item 上，不落在行上 —— 行按 `(role, item, part)` 独立存活，而「完成」通常
     只由收口方落一行，被评审方那一行会一直停在 `待评审`。按行判会把它当成停滞。
-    只在 item 最新事件为终态时折叠：重新开工（终态后再落非终态）即恢复逐行可见。
+    只在主线最新事件为「完成」时折叠（含该项下的子产物行）：重新开工（完成后再落非终态）即恢复逐行可见。
+    「交接」不收口（见 ITEM_CLOSING）；带 `--part` 的子产物事件只管自己那一行，不参与整项收口。
     """
     last = {}
     for e in events:
-        if e.get("item"):
+        if e.get("item") and not e.get("part"):
             last[e["item"]] = e
-    return {i for i, e in last.items() if e.get("status") in TERMINAL}
+    return {i for i, e in last.items() if e.get("status") in ITEM_CLOSING}
 
 
 def _item_key(item):
@@ -245,6 +254,9 @@ def cmd_append(a):
         sys.exit(f"decision 非法：{a.decision}（须 ∈ {sorted(DECISIONS)}）")
     if a.status == "阻塞" and not a.blocker:
         sys.exit("status=阻塞 时必须给 --blocker（卡在谁/什么）")
+    part = (a.part or "").strip()
+    if a.part is not None and not part:
+        sys.exit("--part 不能为空白（省略即为主线）")
     version = a.version.strip() if a.version else ""
     if a.version and not version:
         sys.exit("--version 不能为空白（省略即用 system-version.json 的版本）")
@@ -268,6 +280,8 @@ def cmd_append(a):
 
     ev = {"ts": _now(), "role": a.role, "item": a.item, "phase": phase,
           "status": a.status, "version": version or _current_version()}
+    if part:
+        ev["part"] = part                 # 子产物：只管自己那一行，不参与整项收口
     if a.force_new_item:
         ev["forced_new_item"] = True      # 留痕：这条是显式绕过同名硬拒建的
     if successor:
@@ -285,7 +299,7 @@ def cmd_append(a):
             os.write(fd, line.encode("utf-8"))
         finally:
             os.close(fd)
-    print(f"[team-ledger] {ev['role']} · {ev['item']} · {ev['status']} @ {ev['ts']}")
+    print(f"[team-ledger] {ev['role']} · {_label(ev['item'], part)} · {ev['status']} @ {ev['ts']}")
     if a.item not in _existing and _existing:
         _show = "、".join(_existing[:5])
         _more = f"（另有 {len(_existing) - 5} 项）" if len(_existing) > 5 else ""
@@ -304,7 +318,7 @@ def cmd_stale(a):
         events = _read_events()
     closed = _closed_items(events)
     rows, unknown, folded = [], [], 0
-    for (role, item), e in _current(events).items():
+    for (role, item, part), e in _current(events).items():
         if e.get("status") in TERMINAL:
             continue
         if item in closed:
@@ -312,9 +326,9 @@ def cmd_stale(a):
             continue
         age = _hours_since(e.get("ts", ""))
         if age is None:
-            unknown.append((role, item, e))
+            unknown.append((role, _label(item, part), e))
         elif age >= a.hours:
-            rows.append((age, role, item, e))
+            rows.append((age, role, _label(item, part), e))
 
     def _tail(e):
         """接续方 ＋ 卡点：非终态行的意义全在「棒在谁手里」。"""
@@ -330,14 +344,14 @@ def cmd_stale(a):
         return ("  " + " · ".join(bits)) if bits else ""
 
     if rows:
-        rows.sort(reverse=True)
+        rows.sort(key=lambda r: r[:3], reverse=True)
         label = "非终态项" if a.hours == 0 else f"项停滞 ≥ {a.hours}h"
         print(f"[team-ledger] {len(rows)} {label}：")
         for age, role, item, e in rows:
             print(f"  {age:5.1f}h  {role:3} {e.get('status','')}  {item}{_tail(e)}")
     if unknown:
         print(f"[team-ledger] {len(unknown)} 项无法判定（ts 不可解析，未必没停滞）：")
-        for role, item, e in sorted(unknown):
+        for role, item, e in sorted(unknown, key=lambda r: r[:2]):
             print(f"    ts={e.get('ts','')!r}  {role:3} {e.get('status','')}  {item}{_tail(e)}")
     if folded:
         print(f"[team-ledger] 另有 {folded} 行归属于已收口的工作项，不计入停滞")
@@ -359,14 +373,14 @@ def cmd_owner(a):
     with _locked():
         events = _read_events()
     closed = _closed_items(events)
-    rows = [(e.get("ts", ""), role, item, e)
-            for (role, item), e in _current(events).items()
+    rows = [(e.get("ts", ""), role, _label(item, part), e)
+            for (role, item, part), e in _current(events).items()
             if e.get("blocker_role") == OWNER_ROLE
             and e.get("status") not in TERMINAL and item not in closed]
     if not rows:
         print("[team-ledger] 无待产品负责人裁决的项")
         return
-    rows.sort()
+    rows.sort(key=lambda r: r[:3])
     print(f"[team-ledger] {len(rows)} 项待你裁决——这些阻塞的接续方是产品负责人，不是 subagent，只能等人：")
     for ts, role, item, e in rows:
         age = _hours_since(ts)
@@ -384,6 +398,9 @@ def main():
     apd = sub.add_parser("append", help="追加一条状态变更事件")
     apd.add_argument("--role", required=True)
     apd.add_argument("--item", required=True)
+    apd.add_argument("--part", default=None,
+                     help="子产物名：同一工作项内并行推进的子产物（如主线开发时 PM 澄清其中一份）。"
+                          "只管自己那一行，交接 / 完成都不让整项收口；stale 显示为「工作项/子产物」")
     apd.add_argument("--status", required=True)
     apd.add_argument("--phase", default="")
     apd.add_argument("--round", type=int, default=None,

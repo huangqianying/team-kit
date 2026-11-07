@@ -27,7 +27,7 @@ description: 向团队协作状态账本落账。PM/UI/SE/QA/SA 在工作发生�
 ```bash
 python3 skills/team-ledger/team-ledger.py append \
   --role <pm|ui|sa|se|qa> \
-  --item <工作项短标识，如 i0-spec> \
+  --item <工作项短标识，如 i0-spec> [--part <子产物名>] \
   --phase <requirement|design|ui-design|ui-proto|spec|plan|dev|ui-review|test-design|test-case|test|accept|review|deploy> \
   --status <进行中|待评审|评审中|阻塞|完成|交接> \
   [--round N] [--decision APPROVED|CR] \
@@ -35,7 +35,8 @@ python3 skills/team-ledger/team-ledger.py append \
   [--note "一句话摘要"] [--version <版本>|_infra]
 ```
 
-- `--role` 填**你自己的角色**。`--item` 同一工作项跨状态**保持同名**（当前态按 `(role,item)` 取最新）。
+- `--role` 填**你自己的角色**。`--item` 同一工作项跨状态**保持同名**（当前态按 `(role,item,part)` 取最新）。
+- **同一工作项内并行的子产物必须带 `--part <子产物名>`**（如主线 SE 开发时，PM 澄清其中一份子产物）：子线的 `交接` / `完成` 只收它自己那一行，不会让整项收口、把主线的「进行中」折叠掉；`stale` 显示为 `工作项/子产物`。整项只在**主线**落 `完成` 时收口，`交接` 不收口整项。
 - **`--phase` / `--status` / `--decision` 有枚举校验**，非法值当场硬拒且**不落账**（校验不通过还落账 = 账本进脏数据）。中文门名（`开发`/`系统设计`/`界面走查`…）自动归一。
 - **非终态必须指定接续方**：`交接`/`待评审` 用 `--to`，`阻塞` 用 `--blocker-role`。落账**不派活**，接续方是给 SA 看的状态标记 —— 不写，SA 就看不出这棒该派给谁，等于掉棒。
 - **接续方是产品负责人**（等裁定 / 等排期）→ 写 `owner`：该项进待裁决清单（`team-ledger.py owner`），**只能等人，不派 subagent**。
