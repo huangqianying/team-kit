@@ -63,7 +63,7 @@ git push origin main --tags
 
 ## 新工程首次落地后要做的
 
-- 填 `docs/rules/工程配置.md` 每一节，不适用写「无」；节名不要改（`kit check` 会核）。
+- 填 `docs/rules/工程配置.md` 每一节，不适用写「无」；节名不要改（`kit check` 会核）。「并行线」一节不填，本工程就不开并行线（`kit check` 只警告）。
 - 填 `docs/rules/UI设计规范-本工程实例.md`（本产品的 UI 取值；不适用的节写「不适用」并给依据）。
 - 填 `.githooks/project.conf`，跑一次 `bash .githooks/tests/hooks.test.sh`。
 - 准备 `system-version.json`（`{"version": "...", "status": "in-progress", "updated": "YYYY-MM-DD HH:MM"}`）。
