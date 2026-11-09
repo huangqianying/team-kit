@@ -27,6 +27,8 @@ STAMP = ".team-kit.json"
 SYMLINKS = {".claude/skills": "../skills", ".codex/skills": "../skills"}
 GITIGNORE_LINE = ".team-ledger/"
 PROFILE_DOC = "docs/rules/工程配置.md"
+# 软节：缺失只警告不报错（已安装的工程同步后可以晚些再补；契约写明缺失时的兜底）
+SOFT_SECTIONS = {"## 并行线"}
 UI_INSTANCE_DOC = "docs/rules/UI设计规范-本工程实例.md"
 IGNORED_NAMES = {"__pycache__", ".DS_Store"}
 
@@ -143,7 +145,11 @@ def check(project, quiet=False):
         text = open(pdoc, encoding="utf-8").read()
         have = {l.strip() for l in text.splitlines() if l.startswith("## ")}
         for s in profile_sections():
-            if s not in have:
+            if s in have:
+                continue
+            if s in SOFT_SECTIONS:
+                warns.append(f"工程配置 缺节「{s[3:]}」（未填时本工程不开并行线，按原规则执行）")
+            else:
                 errors.append(f"工程配置 缺节「{s[3:]}」（节名是内核引用的锚点）")
         if "<例" in text or "<…>" in text:
             warns.append(f"工程配置 {PROFILE_DOC} 仍有未填的模板占位")

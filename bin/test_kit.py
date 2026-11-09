@@ -95,6 +95,36 @@ def t_check_profile_sections():
     shutil.rmtree(d)
 
 
+def t_check_soft_section_missing_only_warns():
+    d = new_repo()
+    run("install", d)
+    p = os.path.join(d, kit.PROFILE_DOC)
+    s = open(p, encoding="utf-8").read()
+    i = s.index("## 并行线\n")
+    j = s.index("\n## ", i + 1)
+    open(p, "w", encoding="utf-8").write(s[:i] + s[j + 1:])
+    errors, warns = kit.check(d, quiet=True)
+    ok(not any("并行线" in e for e in errors), f"缺「并行线」不算错（{errors}）")
+    ok(any("缺节「并行线」" in w for w in warns), "缺「并行线」给出警告")
+    rc, _ = run("check", d)
+    ok(rc == 0, "只缺软节时 check 退出 0")
+    shutil.rmtree(d)
+
+
+def t_kernel_config_refs_are_profile_sections():
+    import re
+    have = {s[3:] for s in kit.profile_sections()}
+    files, _ = kit.kernel_files()
+    missing = set()
+    for rel in files:
+        if rel.endswith(".md"):
+            text = open(os.path.join(kit.TEMPLATE, rel), encoding="utf-8").read()
+            for name in re.findall(r"工程配置「([^」]+)」", text):
+                if name not in have:
+                    missing.add(f"{rel}: {name}")
+    ok(not missing, f"内核引用的工程配置节都在 profile 里（缺：{sorted(missing)}）")
+
+
 def t_sync_refuses_local_edit_and_force_overrides():
     d = new_repo()
     run("install", d)
