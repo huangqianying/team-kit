@@ -152,7 +152,139 @@ def t_lanes(tmp):
     check("lane/worktree 泛指不报", "lane/worktree" not in o, o)
 
 
-ALL = [t_scope, t_migrations, t_migration_dir_from_config, t_plan, t_lanes]
+# ───────────────────────── hook.py ─────────────────────────
+
+LEDGER_SRC = os.path.join(os.path.dirname(HERE), "team-ledger", "team-ledger.py")
+
+
+def kit_project(tmp, ledger_events=None):
+    """装了 kit 的临时工程：.team-kit.json 记 AGENTS.md 为内核文件；账本在临时目录。"""
+    d = new_repo(tmp, "proj")
+    write(d, "AGENTS.md", "kernel")
+    write(d, ".team-kit.json", json.dumps({"kit_version": "v0", "files": {"AGENTS.md": "x"}}))
+    os.makedirs(os.path.join(d, "skills", "team-ledger"))
+    shutil.copy(LEDGER_SRC, os.path.join(d, "skills", "team-ledger", "team-ledger.py"))
+    led = ledger(tmp, ledger_events or [])
+    return d, led
+
+
+def hook(event, payload, env_extra=None, cwd=None):
+    env = dict(os.environ, **(env_extra or {}))
+    data = payload if isinstance(payload, str) else json.dumps(payload, ensure_ascii=False)
+    return subprocess.run([sys.executable, HOOK, event], input=data, cwd=cwd, env=env,
+                          capture_output=True, text=True, timeout=60)
+
+
+def ctx(r):
+    try:
+        return json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"]
+    except (ValueError, KeyError, TypeError):
+        return ""
+
+
+def hook_files(led):
+    root = os.path.join(led, "hooks")
+    return [os.path.join(a, f) for a, _, fs in os.walk(root) for f in fs] if os.path.isdir(root) else []
+
+
+def t_hook_bad_input_is_silent(tmp):
+    d, led = kit_project(tmp)
+    env = {"TEAM_LEDGER_DIR": led}
+    for ev in ("SessionStart", "PostToolUse", "SubagentStart", "SubagentStop"):
+        for bad in ("", "{", json.dumps({"cwd": d})):
+            r = hook(ev, bad, env, cwd=d)
+            check(f"{ev} 输入「{bad[:8]}」→ 退出 0", r.returncode == 0, r.stderr)
+            check(f"{ev} 输入「{bad[:8]}」→ 不输出", r.stdout.strip() == "", r.stdout)
+    check("坏输入不留状态文件", hook_files(led) == [], str(hook_files(led)))
+
+
+def t_session_start_injects_ledger(tmp):
+    evs = [{"ts": "2026-11-23 10:00", "role": "se", "item": "条目甲", "status": "进行中", "phase": "dev"}]
+    evs += [{"ts": "2026-11-23 10:00", "role": "se", "item": f"填充{i}", "status": "进行中"} for i in range(40)]
+    d, led = kit_project(tmp, evs)
+    r = hook("SessionStart", {"cwd": d, "session_id": "s1", "hook_event_name": "SessionStart", "source": "startup"},
+             {"TEAM_LEDGER_DIR": led}, cwd=d)
+    c = ctx(r)
+    check("SessionStart 注入非终态项", "条目甲" in c or "填充" in c, r.stdout + r.stderr)
+    check("SessionStart 注入 ≤ 2000 字符", 0 < len(c) <= 2000, str(len(c)))
+
+
+def t_session_start_outside_kit_project(tmp):
+    d = new_repo(tmp)
+    led = ledger(tmp, [{"ts": "2026-11-23 10:00", "role": "se", "item": "x", "status": "进行中"}])
+    r = hook("SessionStart", {"cwd": d, "session_id": "s1", "source": "startup"}, {"TEAM_LEDGER_DIR": led}, cwd=d)
+    check("没装 kit 的仓库不注入", r.returncode == 0 and r.stdout.strip() == "", r.stdout)
+
+
+def t_kernel_edit_warns_once_per_session(tmp):
+    d, led = kit_project(tmp)
+    env = {"TEAM_LEDGER_DIR": led}
+    p = {"cwd": d, "session_id": "s9", "hook_event_name": "PostToolUse", "tool_name": "Edit",
+         "tool_input": {"file_path": os.path.join(d, "AGENTS.md")}}
+    r1 = hook("PostToolUse", p, env, cwd=d)
+    check("改内核文件 → 提醒", "内核文件" in ctx(r1) and "AGENTS.md" in ctx(r1), r1.stdout + r1.stderr)
+    r2 = hook("PostToolUse", p, env, cwd=d)
+    check("同一会话同一文件只提醒一次", r2.stdout.strip() == "", r2.stdout)
+    q = dict(p, tool_input={"file_path": os.path.join(d, "README.md")})
+    r3 = hook("PostToolUse", q, env, cwd=d)
+    check("改普通文件不提醒", r3.stdout.strip() == "", r3.stdout)
+
+
+def t_codex_apply_patch_paths(tmp):
+    d, led = kit_project(tmp)
+    patch = (f"*** Begin Patch\n*** Update File: {d}/AGENTS.md\n@@\n-kernel\n+k2\n"
+             f"*** Add File: {d}/docs/new.md\n+new\n*** End Patch")
+    p = {"cwd": d, "session_id": "c1", "hook_event_name": "PostToolUse", "tool_name": "apply_patch",
+         "tool_input": {"command": patch}}
+    r = hook("PostToolUse", p, {"TEAM_LEDGER_DIR": led}, cwd=d)
+    check("Codex apply_patch 解析出内核文件并提醒", "AGENTS.md" in ctx(r) and "docs/new.md" not in ctx(r),
+          r.stdout + r.stderr)
+
+
+def t_check_after_edit(tmp):
+    import time
+    d, led = kit_project(tmp)
+    env = {"TEAM_LEDGER_DIR": led}
+    p = {"cwd": d, "session_id": "k1", "hook_event_name": "PostToolUse", "tool_name": "Write",
+         "tool_input": {"file_path": os.path.join(d, "README.md")}}
+    write(d, ".githooks/project.conf", "HOOK_CRED_HINT='x'\nCHECK_AFTER_EDIT='sh -c \"echo bad; exit 1\"'\n")
+    r = hook("PostToolUse", p, env, cwd=d)
+    check("工程检查失败 → 提醒含输出", "bad" in ctx(r), r.stdout + r.stderr)
+    write(d, ".githooks/project.conf", "CHECK_AFTER_EDIT='sh -c \"echo fine; exit 0\"'\n")
+    r = hook("PostToolUse", p, env, cwd=d)
+    check("工程检查通过 → 不提醒", r.stdout.strip() == "", r.stdout)
+    write(d, ".githooks/project.conf", "CHECK_AFTER_EDIT='sh -c \"sleep 20\"'\n")
+    t0 = time.time()
+    r = hook("PostToolUse", p, env, cwd=d)
+    check("工程检查超时 8 秒左右返回、退出 0", r.returncode == 0 and time.time() - t0 < 15, f"{time.time() - t0:.1f}s")
+
+
+def t_subagent_stop_reminds_once(tmp):
+    d, led = kit_project(tmp)
+    env = {"TEAM_LEDGER_DIR": led}
+    base = {"cwd": d, "session_id": "s1"}
+    hook("SubagentStart", dict(base, hook_event_name="SubagentStart", agent_id="a1", agent_type="se"), env, cwd=d)
+    stop = dict(base, hook_event_name="SubagentStop", agent_id="a1", agent_type="se", stop_hook_active=False)
+    r = hook("SubagentStop", stop, env, cwd=d)
+    check("SE 没落账就结束 → 提醒", "还没有落账" in ctx(r), r.stdout + r.stderr)
+    r = hook("SubagentStop", dict(stop, stop_hook_active=True), env, cwd=d)
+    check("stop_hook_active 时不再提醒", r.stdout.strip() == "", r.stdout)
+    hook("SubagentStart", dict(base, hook_event_name="SubagentStart", agent_id="a2", agent_type="se"), env, cwd=d)
+    subprocess.run([sys.executable, os.path.join(d, "skills/team-ledger/team-ledger.py"), "append",
+                    "--role", "se", "--item", "w", "--status", "进行中"], cwd=d,
+                   env=dict(os.environ, TEAM_LEDGER_DIR=led, TEAM_LEDGER_GIT_DIR=d), capture_output=True)
+    r = hook("SubagentStop", dict(stop, agent_id="a2"), env, cwd=d)
+    check("SE 落过账 → 不提醒", r.stdout.strip() == "", r.stdout)
+    hook("SubagentStart", dict(base, hook_event_name="SubagentStart", agent_id="a3", agent_type="Explore"), env, cwd=d)
+    r = hook("SubagentStop", dict(stop, agent_id="a3", agent_type="Explore"), env, cwd=d)
+    check("非团队角色不提醒", r.stdout.strip() == "", r.stdout)
+    check("结束后不留开始时间文件", [f for f in hook_files(led) if "/agents/" in f] == [], str(hook_files(led)))
+
+
+ALL = [t_scope, t_migrations, t_migration_dir_from_config, t_plan, t_lanes,
+       t_hook_bad_input_is_silent, t_session_start_injects_ledger, t_session_start_outside_kit_project,
+       t_kernel_edit_warns_once_per_session, t_codex_apply_patch_paths, t_check_after_edit,
+       t_subagent_stop_reminds_once]
 
 
 def main():
