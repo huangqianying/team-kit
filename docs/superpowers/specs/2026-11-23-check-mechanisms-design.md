@@ -235,3 +235,26 @@ Codex 的 `apply_patch` 一次可能改多个文件，路径从 `tool_input` 里
 | C9 | SA 不适用 R1、R2 | SA 的「待评审」「完成」多是登记、裁定、合入，回放只过 7/25；硬拒会让 SA 天天用 `--no-commit` |
 | C10 | `lanes` 只看未收口工作项；H1 只注入「多出」 | 历史上出现过约 40 个线名，都看会天天报「缺失」刷屏；「多出」才说明有人开了线没登记，最需要提醒 |
 | C11 | 没有产物的工作用 `--no-commit '理由'` 是正常用法 | prism 约三成落账没有提交号，大多是只读、运维类；让它们写明「没有产物」正是这条规则要的效果 |
+
+## 附录 A：钩子实测（2026-11-23）
+
+**环境**：scratchpad 下的临时 git 仓库，两个宿主都挂了一个把 stdin 原样记进日志的钩子。
+- Claude Code 2.1.330：`claude -p … --permission-mode bypassPermissions`，主会话写 `main.txt`，再派 `se` 子代理写 `sub.txt`。
+- Codex 0.167.0：`codex exec -s workspace-write --dangerously-bypass-hook-trust`，并用 `-c projects."<路径>".trust_level="trusted"` 信任临时仓库。共跑两次：
+  - 第一次：主会话、子代理各写一个文件；
+  - 第二次：明确要求用 `apply_patch` 改 `README.md`，并新增 `docs/new.md`。
+- 注意：`codex exec` 的 stdin 不是终端时可能一直等输入，要接 `< /dev/null`。第一次尝试因此卡住，直到超时。
+
+| 问题 | Claude Code | Codex |
+|---|---|---|
+| `SessionStart` 带 `source` | 带，`"source": "startup"` | 带，`"source": "startup"` |
+| 写文件后的工具名 | `Write`（matcher `Write\|Edit\|NotebookEdit` 命中） | `apply_patch`。matcher 写 `apply_patch`、写 `Edit\|Write`、不写 matcher，**三种都命中**，所以只挂 `apply_patch` 一个，避免重复提醒 |
+| 被改文件的路径 | `tool_input.file_path`，绝对路径 | `tool_input.command` 里的补丁文本，每个文件一行 `*** Update File: <绝对路径>` 或 `*** Add File: <绝对路径>`（删除为 `*** Delete File:`），以 `*** Begin Patch` 开头 |
+| 子代理里写文件，输入带不带 `agent_id`、`agent_type` | 带，`"agent_type": "se"`（即 frontmatter 的 `name`） | 带，`"agent_type": "se"`，`agent_id` 是 UUID |
+| `SubagentStart`、`SubagentStop` | 都触发，`SubagentStop` 带 `stop_hook_active: false` 和 `last_assistant_message` | 都触发，字段同左 |
+| 用 shell 写文件 | 本次未出现 | **Codex 默认常用 shell 写文件**（`printf … > main.txt`），这时 `tool_name` 为 `Bash`，输入只有命令文本 |
+
+**对设计的影响**：
+- H2 的 Codex matcher 定为 `apply_patch`，路径从 `tool_input.command` 解析。
+- 用 shell 写的文件，H2 一律不提醒，Claude Code 下也一样。这是只提醒机制已知的覆盖缺口；提交时 `.githooks/pre-commit` 的内核改动提醒仍然兜底。
+- H3 在两个宿主上都按 `agent_type` 判断角色，可行。
