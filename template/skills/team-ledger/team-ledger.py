@@ -229,6 +229,66 @@ def _current_version():
     return INFRA_VERSION
 
 
+# ───── 提交号核对（R1–R3）：落账引用的提交必须真实存在 ─────
+ARTIFACT_ROLES = {"pm", "ui", "se", "qa"}          # R1/R2 只管产出角色；SA 的登记、裁定、合入不在此列
+_SHA_RE = re.compile(r"(?<![0-9a-fA-F])[0-9a-fA-F]{7,40}(?![0-9a-fA-F])")
+_PATH_RE = re.compile(
+    r"[\w\u4e00-\u9fff.\-]+/[\w\u4e00-\u9fff./\-]*"
+    r"|[\w\u4e00-\u9fff\-]+\.(?:md|py|java|ts|vue|sql|json|sh|yml|yaml|toml|html|js|css|txt|jsonl)\b")
+
+
+def _shas(note):
+    return [m.lower() for m in _SHA_RE.findall(note or "")]
+
+
+def _has_path(note):
+    return bool(_PATH_RE.search(note or ""))
+
+
+def _git_repo():
+    """提交号在调用方所在仓库核对；各工作树共用对象库，线分支上的提交也查得到。"""
+    return os.environ.get("TEAM_LEDGER_GIT_DIR") or os.getcwd()
+
+
+def _repo_judgeable(repo):
+    """仓库能不能用来核提交号：是 git 仓库且 git 可用。"""
+    try:
+        return subprocess.run(["git", "-C", repo, "rev-parse", "--git-dir"],
+                              capture_output=True, text=True, timeout=10).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def _commit_exists(sha, repo):
+    """True/False；None = 判不了（不是 git 仓库、没有 git）。判不了 ≠ 不存在。"""
+    if not _repo_judgeable(repo):
+        return None
+    try:
+        r = subprocess.run(["git", "-C", repo, "cat-file", "-e", f"{sha}^{{commit}}"],
+                           capture_output=True, text=True, timeout=10)
+        return r.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def _any_commit_exists(shas, repo):
+    """有一个存在即 True；全不存在 False；判不了 None。"""
+    if not _repo_judgeable(repo):
+        return None
+    if not shas:
+        return False
+    results = [_commit_exists(s, repo) for s in shas]
+    if any(x is True for x in results):
+        return True
+    if any(x is None for x in results):
+        return None
+    return False
+
+
+def _warn_unjudgeable(what):
+    print(f"[team-ledger] 警告：{what}判不了（{_git_repo()} 不是 git 仓库或 git 不可用），本次照常落账", file=sys.stderr)
+
+
 def cmd_append(a):
     if a.role not in ROLES:
         sys.exit(f"role 非法：{a.role}（须 ∈ {sorted(ROLES)}）")
@@ -260,6 +320,31 @@ def cmd_append(a):
     version = a.version.strip() if a.version else ""
     if a.version and not version:
         sys.exit("--version 不能为空白（省略即用 system-version.json 的版本）")
+    no_commit = (a.no_commit or "").strip()
+    if a.no_commit is not None and not no_commit:
+        sys.exit("--no-commit 必须写理由（这次为什么没有产物提交）")
+    repo = _git_repo()
+    if a.role in ARTIFACT_ROLES and a.status in ("待评审", "完成", "交接") and not no_commit:
+        found = _any_commit_exists(_shas(a.note), repo)
+        rule = "R1" if a.status == "待评审" else "R2"
+        if found is None:
+            _warn_unjudgeable("提交号是否存在")
+        elif not found:
+            sys.exit(f"{rule}：{a.role} 落「{a.status}」须在 --note 里写一个仓库里存在的提交号"
+                     f"（{'没找到提交号' if not _shas(a.note) else '提交号在仓库里不存在'}）。\n"
+                     f"确实没有产物（只读排查、运维、咨询）时用 --no-commit '理由' 写明。")
+        if a.status == "待评审" and found is True and not _has_path(a.note):
+            sys.exit("R1：待评审须在 --note 里指认被评产物的路径（提交号之外再写一个路径，如 docs/x.md）。\n"
+                     "确实没有产物时用 --no-commit '理由' 写明。")
+    base = (a.base or "").strip()
+    if a.base is not None:
+        if not _SHA_RE.fullmatch(base):
+            sys.exit(f"--base 须是提交号（7–40 位十六进制）：{a.base}")
+        ok = _commit_exists(base.lower(), repo)
+        if ok is None:
+            _warn_unjudgeable("起点提交是否存在")
+        elif not ok:
+            sys.exit(f"--base 提交在仓库里不存在：{base}")
 
     with _locked():
         _events = _read_events()
@@ -278,6 +363,13 @@ def cmd_append(a):
                 f"拆成两行等于把一条线记成两条，其中一条没人认领。\n"
                 f"请原样沿用「{_clash}」；确属另一件事则加 --force-new-item。")
 
+    if (a.role == "sa" and a.status == "交接" and a.to == "se" and phase == "dev" and not base
+            and not any(e.get("base") and e.get("item") == a.item and (e.get("part") or "") == part
+                        for e in _events)):
+        sys.exit(f"R3：给 SE 派开发活（--phase dev）须带 --base <起点提交>——"
+                 f"「{_label(a.item, part)}」还没记过起点提交。起点 = SE 开工所基于的集成分支（或线）提交，"
+                 f"「先失败再通过」和旧失败分类都以它为准（docs/rules/派活与交付.md「一」）。")
+
     ev = {"ts": _now(), "role": a.role, "item": a.item, "phase": phase,
           "status": a.status, "version": version or _current_version()}
     if part:
@@ -289,7 +381,8 @@ def cmd_append(a):
     if a.round is not None:
         ev["round"] = a.round
     for k, v in (("decision", a.decision), ("review", a.review),
-                 ("blocker", a.blocker), ("note", a.note)):
+                 ("blocker", a.blocker), ("note", a.note),
+                 ("base", base), ("no_commit", no_commit)):
         if v:
             ev[k] = v
     line = json.dumps(ev, ensure_ascii=False) + "\n"
@@ -317,6 +410,10 @@ def cmd_stale(a):
     with _locked():
         events = _read_events()
     closed = _closed_items(events)
+    bases = {}
+    for e in events:
+        if e.get("base"):
+            bases[(e.get("item"), e.get("part") or "")] = e["base"]
     rows, unknown, folded = [], [], 0
     for (role, item, part), e in _current(events).items():
         if e.get("status") in TERMINAL:
@@ -341,6 +438,9 @@ def cmd_stale(a):
             bits.append(f"卡在 {e['blocker']}")
         if e.get("round") not in (None, ""):
             bits.append(f"r{e['round']}")
+        b = bases.get((e.get("item"), e.get("part") or ""))
+        if b:
+            bits.append(f"起点 {b[:8]}")
         return ("  " + " · ".join(bits)) if bits else ""
 
     if rows:
@@ -412,6 +512,9 @@ def main():
                      help="阻塞 的被卡方；写 owner 则进待裁决清单")
     apd.add_argument("--blocker", default="")
     apd.add_argument("--note", default="")
+    apd.add_argument("--base", default=None, help="起点提交：给 SE 派开发活（--phase dev）首次必填")
+    apd.add_argument("--no-commit", dest="no_commit", default=None,
+                     help="没有产物提交时写明理由（pm/ui/se/qa 落 待评审/完成/交接 时替代提交号）")
     apd.add_argument("--version", default="", help="省略即用 system-version.json 的版本")
     apd.add_argument("--force-new-item", dest="force_new_item", action="store_true",
                      help="绕过同名硬拒（须同时给 --note 理由）")

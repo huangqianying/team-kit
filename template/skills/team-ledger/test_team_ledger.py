@@ -31,12 +31,14 @@ def mkenv(tmp, version="v9.9.9"):
     if version is not None:
         with open(os.path.join(tmp, "system-version.json"), "w", encoding="utf-8") as f:
             json.dump({"version": version, "status": "in-progress"}, f)
-    return dict(os.environ, TEAM_LEDGER_DIR=tmp)
+    # 提交号核对在 TEAM_LEDGER_GIT_DIR 指向的仓库里做；临时目录不是 git 仓库 ⇒ 判不了、只警告，不影响老判据
+    return dict(os.environ, TEAM_LEDGER_DIR=tmp, TEAM_LEDGER_GIT_DIR=tmp)
 
 
 def run(env, *args):
     return subprocess.run([sys.executable, LEDGER, *args],
-                          capture_output=True, text=True, env=env)
+                          capture_output=True, text=True, env=env,
+                          cwd=env.get("TEAM_LEDGER_GIT_DIR"))
 
 
 def out(r):
@@ -349,13 +351,132 @@ def t_part_owner_and_validation(tmp):
     check("待裁决清单按「工作项/子产物」列出", r.returncode == 1 and "I6/配色" in out(r), out(r))
 
 
+# ───────────────────────── 提交号硬拒 R1–R3 ─────────────────────────
+
+def _git(d, *a):
+    return subprocess.run(["git", "-C", d, *a], capture_output=True, text=True, check=True).stdout.strip()
+
+
+def _repo(tmp):
+    """临时 git 仓库：提交 A 在主线，提交 B 只在分支 lane/x（挂成工作树）。返回 (env, A, B)。"""
+    repo = os.path.join(tmp, "repo")
+    os.makedirs(repo)
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "t@example.invalid")
+    _git(repo, "config", "user.name", "t")
+    open(os.path.join(repo, "a.txt"), "w").write("a")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "A")
+    a = _git(repo, "rev-parse", "HEAD")
+    wt = os.path.join(tmp, "wt")
+    _git(repo, "worktree", "add", "-q", "-b", "lane/x", wt)
+    open(os.path.join(wt, "b.txt"), "w").write("b")
+    _git(wt, "add", ".")
+    _git(wt, "commit", "-qm", "B")
+    b = _git(wt, "rev-parse", "HEAD")
+    led = os.path.join(tmp, "led")
+    os.makedirs(led)
+    env = mkenv(led)
+    env["TEAM_LEDGER_GIT_DIR"] = repo
+    return env, a, b
+
+
+def t_r1_review_needs_commit_and_path(tmp):
+    env, a, _ = _repo(tmp)
+    r = append(env, role="se", item="w", status="待评审", to="sa", note=f"{a[:8]} docs/x.md")
+    check("R1 提交号＋路径 → 通过", r.returncode == 0, out(r))
+    r = append(env, role="se", item="w", status="待评审", to="sa", note=f"{a[:8]}")
+    check("R1 只有提交号没路径 → 拒", r.returncode != 0 and "路径" in out(r), out(r))
+    r = append(env, role="se", item="w", status="待评审", to="sa", note="deadbee docs/x.md")
+    check("R1 提交号不存在 → 拒", r.returncode != 0 and "不存在" in out(r), out(r))
+
+
+def t_r1_sa_exempt(tmp):
+    env, _, _ = _repo(tmp)
+    r = append(env, role="sa", item="w", status="待评审", to="pm", note="合评输入就绪")
+    check("R1 SA 不适用", r.returncode == 0, out(r))
+
+
+def t_r2_done_needs_commit(tmp):
+    env, a, _ = _repo(tmp)
+    r = append(env, role="qa", item="w", status="完成", note="报告已出")
+    check("R2 完成无提交号 → 拒", r.returncode != 0 and "--no-commit" in out(r), out(r))
+    r = append(env, role="qa", item="w", status="完成", note=f"报告 {a[:10]}")
+    check("R2 带存在的提交号 → 通过", r.returncode == 0, out(r))
+    r = append(env, role="qa", item="w2", status="完成", no_commit="只读排查")
+    check("R2 --no-commit 写理由 → 通过", r.returncode == 0, out(r))
+    check("事件记下 no_commit", events(env["TEAM_LEDGER_DIR"])[-1].get("no_commit") == "只读排查",
+          json.dumps(events(env["TEAM_LEDGER_DIR"])[-1], ensure_ascii=False))
+    r = append(env, role="pm", item="w3", status="交接", to="sa", note="已澄清")
+    check("R2 交接无提交号 → 拒", r.returncode != 0, out(r))
+
+
+def t_r2_no_commit_blank_rejected(tmp):
+    env, _, _ = _repo(tmp)
+    r = append(env, role="qa", item="w", status="完成", no_commit="  ")
+    check("R2 --no-commit 空白 → 拒", r.returncode != 0, out(r))
+
+
+def t_r3_dev_dispatch_needs_base(tmp):
+    env, a, _ = _repo(tmp)
+    r = append(env, role="sa", item="w1", status="交接", to="se", phase="dev", note="派开发")
+    check("R3 首次开发派活无 --base → 拒", r.returncode != 0 and "--base" in out(r), out(r))
+    r = append(env, role="sa", item="w1", status="交接", to="se", phase="dev", base=a[:8], note="派开发")
+    check("R3 带存在的 --base → 通过", r.returncode == 0, out(r))
+    check("事件记下 base", events(env["TEAM_LEDGER_DIR"])[-1].get("base") == a[:8],
+          json.dumps(events(env["TEAM_LEDGER_DIR"])[-1], ensure_ascii=False))
+    r = append(env, role="sa", item="w1", status="交接", to="se", phase="dev", note="返工")
+    check("R3 同一(工作项,主线)再派不必再带 --base", r.returncode == 0, out(r))
+    r = append(env, role="sa", item="w9", status="交接", to="se", phase="dev", base="deadbee", note="派开发")
+    check("R3 --base 不存在 → 拒", r.returncode != 0 and "不存在" in out(r), out(r))
+
+
+def t_r3_only_dev_phase(tmp):
+    env, _, _ = _repo(tmp)
+    r = append(env, role="sa", item="w", status="交接", to="se", phase="spec", note="写 spec")
+    check("R3 非 dev 派活不要求 --base", r.returncode == 0, out(r))
+
+
+def t_r3_per_part(tmp):
+    env, a, _ = _repo(tmp)
+    append(env, role="sa", item="w", status="交接", to="se", phase="dev", base=a[:8], note="主线")
+    r = append(env, role="sa", item="w", part="b", status="交接", to="se", phase="dev", note="b 线")
+    check("R3 子产物各自记起点：b 无 --base → 拒", r.returncode != 0 and "--base" in out(r), out(r))
+
+
+def t_commit_on_lane_branch_counts(tmp):
+    env, _, b = _repo(tmp)
+    r = append(env, role="se", item="w", status="完成", note=f"线上提交 {b[:9]}")
+    check("线分支上的提交算存在", r.returncode == 0, out(r))
+
+
+def t_commit_check_unjudgeable_warns(tmp):
+    led = os.path.join(tmp, "led")
+    os.makedirs(led)
+    env = mkenv(led)           # TEAM_LEDGER_GIT_DIR=led，不是 git 仓库
+    r = append(env, role="se", item="w", status="完成", note="x")
+    check("判不了只警告、照常落账", r.returncode == 0 and "判不了" in out(r), out(r))
+
+
+def t_stale_shows_base(tmp):
+    env, a, _ = _repo(tmp)
+    append(env, role="sa", item="w", status="交接", to="se", phase="dev", base=a, note="派开发")
+    append(env, role="se", item="w", status="进行中", phase="dev")
+    r = run(env, "stale", "--hours", "0")
+    check("stale 显示起点提交", f"起点 {a[:8]}" in out(r), out(r))
+
+
 ALL = [t_append, t_version_missing, t_reject, t_successor_required, t_owner_successor,
        t_item_clash, t_item_clash_scope, t_force_new_item,
        t_stale_quiet, t_stale_hours0, t_stale_owner_tag, t_stale_bad_ts, t_bad_line,
        t_owner, t_owner_closed, t_concurrent,
        t_removed_subcommands, t_removed_anchor_flags, t_no_md,
        t_ui_phase_alias, t_utc_offset,
-       t_handoff_does_not_fold, t_complete_still_folds, t_part_rows, t_part_owner_and_validation]
+       t_handoff_does_not_fold, t_complete_still_folds, t_part_rows, t_part_owner_and_validation,
+       t_r1_review_needs_commit_and_path, t_r1_sa_exempt, t_r2_done_needs_commit,
+       t_r2_no_commit_blank_rejected, t_r3_dev_dispatch_needs_base, t_r3_only_dev_phase,
+       t_r3_per_part, t_commit_on_lane_branch_counts, t_commit_check_unjudgeable_warns,
+       t_stale_shows_base]
 
 
 def main():
