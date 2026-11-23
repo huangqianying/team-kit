@@ -179,7 +179,7 @@ Codex 的 `apply_patch` 一次可能改多个文件，路径从 `tool_input` 里
 |---|---|
 | `template/skills/team-ledger/SKILL.md`、`DESIGN.md` | 写明 R1–R3、`--no-commit`、`--base`；`stale` 显示起点提交 |
 | `template/docs/rules/团队协作契约.md`「附：状态账本」 | 命令格式里加上 `[--base <提交>] [--no-commit '理由']` |
-| `template/docs/rules/派活与交付.md`「一」 | 起点提交改为「派活落账时用 `--base` 记录」 |
+| `template/docs/rules/派活与交付.md`「一」 | 开发派活写 `--phase dev`，起点提交用 `--base` 记录；没有产物的回报用 `--no-commit` 写明 |
 | `template/skills/sa-review/SKILL.md`「四」 | 收回报核越界时可以用 `team-check scope`（顺带修复 v0.9.0 遗留的次要问题：引用补上 `docs/rules/` 路径） |
 | `template/docs/rules/并行线.md`「八」 | 巡检第 3 步可以用 `team-check plan`、`lanes`；合入前可以用 `migrations` |
 | `template/AGENTS.md` | 一句话说明两个宿主装了只提醒的钩子，以及 Codex 首次要用 `/hooks` 信任 |
