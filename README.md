@@ -74,5 +74,6 @@ git push origin main --tags
 ```bash
 python3 bin/test_kit.py
 python3 template/skills/team-ledger/test_team_ledger.py
+python3 template/skills/team-check/test_team_check.py
 bash template/.githooks/tests/hooks.test.sh
 ```

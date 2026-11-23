@@ -1,6 +1,6 @@
 # 检查机制设计（借鉴 HelixHarness 第二轮）
 
-> 状态：草案，待产品负责人审阅。审过之前不改内核。
+> 状态：产品负责人已批准（2026-11-23），v0.10.0 实施。
 > 日期：2026-11-23
 > 范围：team-kit 内核（`template/`、`MANIFEST`、`bin/`）。
 
@@ -258,3 +258,13 @@ Codex 的 `apply_patch` 一次可能改多个文件，路径从 `tool_input` 里
 - H2 的 Codex matcher 定为 `apply_patch`，路径从 `tool_input.command` 解析。
 - 用 shell 写的文件，H2 一律不提醒，Claude Code 下也一样。这是只提醒机制已知的覆盖缺口；提交时 `.githooks/pre-commit` 的内核改动提醒仍然兜底。
 - H3 在两个宿主上都按 `agent_type` 判断角色，可行。
+
+### 冒烟（2026-11-23，`bin/kit install` 到 scratchpad 的新仓库，账本造一条「冒烟条目甲 · 进行中」）
+
+| 宿主 | 会话开始注入 | 改 `AGENTS.md` 后的提醒 |
+|---|---|---|
+| Claude Code 2.1.330（`claude -p`） | 模型原样复述出「冒烟条目甲」 | 用 Edit 追加一行后，收到「`AGENTS.md` 是 team-kit 内核文件……」 |
+| Codex 0.167.0（`codex exec`，`--dangerously-bypass-hook-trust`） | 日志 `hook: SessionStart Completed`，模型复述出「冒烟条目甲」 | 用 `apply_patch` 追加一行后，日志 `hook: PostToolUse Completed`，收到同一条提醒 |
+
+另：`claude -p` 在未接受信任对话框的目录里会忽略 `permissions.allow`，但钩子照常运行（非交互模式视为已信任，与文档一致）。
+
