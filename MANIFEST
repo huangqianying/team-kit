@@ -23,6 +23,7 @@ docs/rules/roles/qa.md
 .codex/agents/qa.toml
 .codex/config.toml
 skills/team-ledger/
+skills/team-check/
 skills/sa-review/
 skills/technical-review/
 skills/manage-docs/
