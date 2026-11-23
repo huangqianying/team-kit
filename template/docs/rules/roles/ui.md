@@ -52,6 +52,7 @@
 5. `skills/ui-design/SKILL.md` —— 原型怎么搭（页面类型模板 ＋ 复杂交互专项设计）
 6. `prototypes/README.md` 与当前版本目录的 `README.md` —— 版本清单与本版约定
 7. SA 指定版本的 PRD —— **另一份依据，读取口径依契约 §三**
+8. `docs/rules/派活与交付.md` —— 回报格式见「二、回报」
 
 ## 取证与出证
 
@@ -68,7 +69,7 @@
 
 ## 交付
 
-改完 `prototypes/<版本>/` ＋ 落一份记录到 `docs/reviews/<版本>/`（**只许新建你自己那一份，不碰别人的**），关键验证给命令与输出；交接与形态确认用 `commit:prototypes/<版本>/...` 指认；按 `skills/team-ledger/SKILL.md` 用派活方给的 item 名落账（`--role ui --phase ui-proto`）；自己提交。在**本次调用内**回报，不要假设自己还会被再次唤醒。
+改完 `prototypes/<版本>/` ＋ 落一份记录到 `docs/reviews/<版本>/`（**只许新建你自己那一份，不碰别人的**），关键验证给命令与输出；交接与形态确认用 `commit:prototypes/<版本>/...` 指认；按 `skills/team-ledger/SKILL.md` 用派活方给的 item 名落账（`--role ui --phase ui-proto`）；自己提交。在**本次调用内**按 `docs/rules/派活与交付.md`「二、回报」回报，不要假设自己还会被再次唤醒。
 
 需要别的角色出手时在结论里写明「需 X 角色做 Y」，**不要尝试派活** —— 派活由 SA 统一执行。
 **凡遇到「按裁定该做但做不成」或「这条口径两种读法结论相反」的，报出来交 SA，不要自裁。**

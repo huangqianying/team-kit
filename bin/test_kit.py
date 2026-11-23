@@ -137,6 +137,15 @@ def t_dispatch_rule_in_kernel():
         ok(f"## {sec}" in text, f"派活与交付.md 有「{sec}」一节")
 
 
+def t_dispatch_rule_referenced():
+    need = ["docs/rules/团队协作契约.md", "docs/rules/双端协作与交接.md",
+            "docs/rules/roles/pm.md", "docs/rules/roles/ui.md",
+            "docs/rules/roles/se.md", "docs/rules/roles/qa.md"]
+    for rel in need:
+        text = open(os.path.join(kit.TEMPLATE, rel), encoding="utf-8").read()
+        ok("派活与交付.md" in text, f"{rel} 引用了派活与交付.md")
+
+
 def t_sync_refuses_local_edit_and_force_overrides():
     d = new_repo()
     run("install", d)
