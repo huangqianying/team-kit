@@ -165,6 +165,29 @@ def t_dispatch_rule_referenced():
         ok("派活与交付.md" in text, f"{rel} 引用了派活与交付.md")
 
 
+DIFF_IMPACT = "skills/diff-impact/SKILL.md"
+
+
+def t_diff_impact_in_kernel():
+    files, _ = kit.kernel_files()
+    ok(DIFF_IMPACT in files, "diff-impact 在内核清单里")
+    p = os.path.join(kit.TEMPLATE, DIFF_IMPACT)
+    text = open(p, encoding="utf-8").read() if os.path.exists(p) else ""
+    head = text.split("\n---", 1)[0]
+    ok("name: diff-impact" in head, "frontmatter name 为 diff-impact")
+    ok("disable-model-invocation" not in head, "不关模型自动调用")
+    for sec in ["一、输入与范围", "二、方法", "三、兼容性", "四、分级",
+                "五、报告", "六、落位", "七、不是什么"]:
+        ok(f"## {sec}" in text, f"diff-impact 有「{sec}」一节")
+    scope = text.split("## 一、输入与范围", 1)[-1].split("\n## ", 1)[0] if "## 一、输入与范围" in text else ""
+    for s in ["git merge-base", "git ls-files --others --exclude-standard",
+              "git show <sha>:<path>", "rev-parse --verify"]:
+        ok(s in scope, f"「输入与范围」写了 {s}")
+    for s in ["静态分析，未运行测试", "证据确定性", "team-check.py migrations --refs",
+              "§4.1", "docs/tests/<版本>/影响分析-<工作项>.md", "commit:path"]:
+        ok(s in text, f"diff-impact 写了「{s}」")
+
+
 def t_sync_refuses_local_edit_and_force_overrides():
     d = new_repo()
     run("install", d)
