@@ -246,8 +246,9 @@ def _has_path(note):
 
 
 def _git_repo():
-    """提交号在调用方所在仓库核对；各工作树共用对象库，线分支上的提交也查得到。"""
-    return os.environ.get("TEAM_LEDGER_GIT_DIR") or os.getcwd()
+    """提交号在账本所在仓库（主工作树）核对，不随调用方当前目录漂移；
+    各工作树共用对象库，线分支上的提交也查得到。TEAM_LEDGER_GIT_DIR 可覆盖（测试用）。"""
+    return os.environ.get("TEAM_LEDGER_GIT_DIR") or _LEDGER_ROOT
 
 
 def _repo_judgeable(repo):
@@ -332,6 +333,7 @@ def cmd_append(a):
         elif not found:
             sys.exit(f"{rule}：{a.role} 落「{a.status}」须在 --note 里写一个仓库里存在的提交号"
                      f"（{'没找到提交号' if not _shas(a.note) else '提交号在仓库里不存在'}）。\n"
+                     f"提交号前后请用空格或标点隔开（如 `fixed 3e445987`），紧贴字母会被连成一串。\n"
                      f"确实没有产物（只读排查、运维、咨询）时用 --no-commit '理由' 写明。")
         if a.status == "待评审" and found is True and not _has_path(a.note):
             sys.exit("R1：待评审须在 --note 里指认被评产物的路径（提交号之外再写一个路径，如 docs/x.md）。\n"
@@ -364,8 +366,10 @@ def cmd_append(a):
                 f"请原样沿用「{_clash}」；确属另一件事则加 --force-new-item。")
 
     if (a.role == "sa" and a.status == "交接" and a.to == "se" and phase == "dev" and not base
-            and not any(e.get("base") and e.get("item") == a.item and (e.get("part") or "") == part
-                        for e in _events)):
+            and not any(e.get("item") == a.item and (e.get("part") or "") == part
+                        and (e.get("base") or (e.get("role") == "sa" and e.get("status") == "交接"
+                                               and e.get("to") == "se" and e.get("phase") == "dev"))
+                        for e in _events)):    # 已记过起点，或升级前已派过开发（不追溯补记）
         sys.exit(f"R3：给 SE 派开发活（--phase dev）须带 --base <起点提交>——"
                  f"「{_label(a.item, part)}」还没记过起点提交。起点 = SE 开工所基于的集成分支（或线）提交，"
                  f"「先失败再通过」和旧失败分类都以它为准（docs/rules/派活与交付.md「一」）。")

@@ -5,13 +5,13 @@ description: Use when SA checks a returned report for out-of-scope edits, duplic
 
 # team-check：检查命令与运行时钩子
 
-**只读、只提醒。** 这里的命令不改仓库、不落账；钩子不拦截任何写入或停止，出错一律放行。真正会拒绝的检查在账本脚本里（`skills/team-ledger/SKILL.md`「提交号硬拒」）。
+**只读、只提醒。** 这里的命令不改仓库、不落账；钩子不拦截任何写入，出错一律放行；唯一会让流程多走一步的是子代理结束提醒：没落账的团队角色子代理被要求再走一轮去落账，只一次。真正会拒绝的检查在账本脚本里（`skills/team-ledger/SKILL.md`「提交号硬拒」）。
 
 ## 一、手动检查命令（SA 用）
 
 ```bash
 python3 skills/team-check/team-check.py scope --base <起点提交> --commits <提交…> --allow <可写…> [--deny <禁写…>]
-python3 skills/team-check/team-check.py migrations [--dir <迁移目录>]
+python3 skills/team-check/team-check.py migrations [--dir <迁移目录>] [--refs <集成分支> lane/<短名>]
 python3 skills/team-check/team-check.py plan <迭代规划文件>
 python3 skills/team-check/team-check.py lanes
 ```
@@ -19,7 +19,7 @@ python3 skills/team-check/team-check.py lanes
 | 命令 | 什么时候用 | 看什么 |
 |---|---|---|
 | `scope` | 收回报时（`docs/rules/派活与交付.md`「二」） | 这些提交改动的路径是否全在可写范围内、没碰禁写范围。`dir/` 按前缀匹配，其余按通配符匹配 |
-| `migrations` | 合入并行线前（`docs/rules/并行线.md`「五」） | Flyway 迁移版本号（`V<n>__*.sql`）有没有重复。不给 `--dir` 时，从工程配置「目录」表的「数据库迁移」一行读 |
+| `migrations` | 合入并行线前（`docs/rules/并行线.md`「五」） | Flyway 迁移版本号（`V<n>__*.sql`）有没有重复。**合入前要加 `--refs <集成分支> lane/<短名>`**：两边文件名不同不会冲突，只有合在一起看才查得出撞号。不给 `--dir` 时，从工程配置「目录」表的「数据库迁移」一行读 |
 | `plan` | 评迭代规划、巡检第 3 步 | 有没有「并行编排」一节，「线的划分」「合入顺序」是否写了 |
 | `lanes` | 巡检、恢复会话 | `lane/*` 分支和工作树，与**未收口**工作项的 note 里登记的 `lane/<短名>` 是否一致。列「多出」（开了没登记）和「缺失」（登记了却不在） |
 
@@ -32,8 +32,8 @@ python3 skills/team-check/team-check.py lanes
 | 事件 | 做什么 |
 |---|---|
 | 会话开始（含恢复、清空、压缩后） | 有非终态项、待负责人裁决的事、或有工作树没登记时，把它们注入上下文（≤ 2,000 字符）；都没有就不注入 |
-| 写文件后 | 改到 `.team-kit.json` 记录的内核文件时提醒一次（同一会话同一文件只一次）；`.githooks/project.conf` 有 `CHECK_AFTER_EDIT` 时执行它，非 0 退出才把输出注入为提醒 |
-| 子代理开始 / 结束 | 只对 pm / ui / se / qa：开始时记时间；结束时若这个角色从开始以来没落过账，提醒它落账并按「二、回报」回报后再结束（只提醒一次） |
+| 写文件后 | 按**被改文件自己所在的仓库**判断（并行线工作树在工程目录之外也覆盖）：改到该仓库 `.team-kit.json` 记录的内核文件时提醒一次（同一会话同一文件只一次）；该仓库 `.githooks/project.conf` 有 `CHECK_AFTER_EDIT` 时执行它，非 0 退出才把输出注入为提醒 |
+| 子代理开始 / 结束 | 只对 pm / ui / se / qa：开始时记时间；结束时若这个角色从开始以来没落过账，让它带着提醒再走一轮——落账并按「二、回报」回报后再结束（输出 `decision: block` + `reason`，两个宿主都认；只提醒一次，第二次结束直接放行） |
 
 **覆盖范围的边界（如实说）**：
 - 通过 shell 命令写文件（`sed`、重定向、`printf >`）不触发写文件后的钩子。Codex 常这样写文件。内核文件的改动在提交时还有 `.githooks/pre-commit` 兜底提醒。
@@ -47,6 +47,6 @@ python3 skills/team-check/team-check.py lanes
 CHECK_AFTER_EDIT='python3 scripts/check_invariants.py'
 ```
 
-被改文件的路径（相对工程根）会追加在命令后面；8 秒超时；退出 0 不提醒。只解析这一行，不 source 整个文件。
+被改文件的路径（相对工程根）会追加在命令后面；8 秒超时；退出 0 不提醒。只解析这一行，不 source 整个文件；行尾可以带 `#` 注释。**值必须整体加引号**：`.githooks/pre-commit` 会 source 这个文件，不加引号时等号后的命令会在每次提交时被执行。
 
 钩子的状态文件在账本目录下的 `hooks/`（`.team-ledger/hooks/`，不入库）。

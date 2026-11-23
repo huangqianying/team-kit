@@ -111,6 +111,21 @@ def flyway_dupes(path):
     return {v: names for v, names in seen.items() if len(names) > 1}
 
 
+def flyway_dupes_across(repo, rel_dir, refs):
+    """几个分支（如集成分支与线分支）的迁移文件合在一起看：同一版本号对应不同文件名即撞号。
+    文件名不同不会产生 git 冲突，单看任何一边都查不出来。"""
+    seen = {}
+    for ref in refs:
+        r = git(repo, "ls-tree", "-r", "--name-only", ref, "--", rel_dir.rstrip("/") + "/")
+        if r.returncode != 0:
+            raise ValueError(f"读不了 {ref}")
+        for path in r.stdout.splitlines():
+            m = FLYWAY_RE.match(os.path.basename(path))
+            if m:
+                seen.setdefault(int(m.group(1)), set()).add(os.path.basename(path))
+    return {v: sorted(n) for v, n in seen.items() if len(n) > 1}
+
+
 # ─────────── plan ───────────
 
 def plan_missing(text):

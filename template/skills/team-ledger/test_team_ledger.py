@@ -466,6 +466,42 @@ def t_stale_shows_base(tmp):
     check("stale 显示起点提交", f"起点 {a[:8]}" in out(r), out(r))
 
 
+def t_commit_checked_in_ledger_repo(tmp):
+    """提交号在账本所在仓库（主工作树）核对，不随调用方当前目录漂移。"""
+    env0, a, _ = _repo(tmp)
+    repo = env0["TEAM_LEDGER_GIT_DIR"]
+    os.makedirs(os.path.join(repo, "skills", "team-ledger"))
+    shutil.copy(LEDGER, os.path.join(repo, "skills", "team-ledger", "team-ledger.py"))
+    script = os.path.join(repo, "skills", "team-ledger", "team-ledger.py")
+    elsewhere = os.path.join(tmp, "elsewhere")
+    os.makedirs(elsewhere)
+    env = {k: v for k, v in env0.items() if k != "TEAM_LEDGER_GIT_DIR"}
+    def ap(note):
+        return subprocess.run([sys.executable, script, "append", "--role", "se", "--item", "w",
+                               "--status", "完成", "--note", note], cwd=elsewhere, env=env,
+                              capture_output=True, text=True)
+    r = ap("abcdef1234 伪造")
+    check("当前目录在仓库外：伪造提交号仍被拒", r.returncode != 0 and "不存在" in out(r), out(r))
+    r = ap(f"{a[:8]} 真实")
+    check("当前目录在仓库外：真实提交号通过", r.returncode == 0, out(r))
+
+
+def t_r3_exempt_if_dev_dispatched_before(tmp):
+    env, _, _ = _repo(tmp)
+    led = env["TEAM_LEDGER_DIR"]
+    with open(os.path.join(led, "ledger.jsonl"), "a", encoding="utf-8") as f:   # 升级前的存量派活：没有 base
+        f.write(json.dumps({"ts": "2026-11-20 10:00", "role": "sa", "item": "old", "phase": "dev",
+                            "status": "交接", "to": "se", "version": "v9.9.9"}, ensure_ascii=False) + "\n")
+    r = append(env, role="sa", item="old", status="交接", to="se", phase="dev", note="返工再派")
+    check("R3 升级前已派过开发的不要求补记 --base", r.returncode == 0, out(r))
+
+
+def t_r2_error_hints_separator(tmp):
+    env, _, _ = _repo(tmp)
+    r = append(env, role="se", item="w", status="完成", note="fixed3e445987")
+    check("R2 提交号贴着字母 → 报错提示用空格或标点隔开", r.returncode != 0 and "隔开" in out(r), out(r))
+
+
 ALL = [t_append, t_version_missing, t_reject, t_successor_required, t_owner_successor,
        t_item_clash, t_item_clash_scope, t_force_new_item,
        t_stale_quiet, t_stale_hours0, t_stale_owner_tag, t_stale_bad_ts, t_bad_line,
@@ -476,7 +512,8 @@ ALL = [t_append, t_version_missing, t_reject, t_successor_required, t_owner_succ
        t_r1_review_needs_commit_and_path, t_r1_sa_exempt, t_r2_done_needs_commit,
        t_r2_no_commit_blank_rejected, t_r3_dev_dispatch_needs_base, t_r3_only_dev_phase,
        t_r3_per_part, t_commit_on_lane_branch_counts, t_commit_check_unjudgeable_warns,
-       t_stale_shows_base]
+       t_stale_shows_base, t_commit_checked_in_ledger_repo, t_r3_exempt_if_dev_dispatched_before,
+       t_r2_error_hints_separator]
 
 
 def main():

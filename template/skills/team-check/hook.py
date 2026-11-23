@@ -21,15 +21,22 @@ sys.path.insert(0, HERE)
 ROLES = {"pm", "ui", "se", "qa"}
 SESSION_LIMIT = 2000          # 会话开始注入的总长上限（照顾 Codex 的上下文注入上限）
 CHECK_LIMIT = 1500            # 工程检查输出截取长度
+LINE_LIMIT = 160              # 会话开始注入的单行上限（长阻塞原因截断，给后面的行留位置）
 CHECK_TIMEOUT = 8
 LEDGER_TIMEOUT = 5
 PATCH_FILE_RE = re.compile(r"^\*\*\* (?:Add|Update|Delete) File: (.+?)\s*$", re.M)
 
 
 def emit(event, text):
-    if text:
-        print(json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": text}},
-                         ensure_ascii=False))
+    if not text:
+        return
+    if event == "SubagentStop":
+        # 两个宿主都认 decision=block + reason：子代理带着 reason 再走一轮（落账、回报）。
+        # 不是拦截用户操作；stop_hook_active 与开始时间文件保证只提醒一次（附录 A 冒烟）。
+        print(json.dumps({"decision": "block", "reason": text}, ensure_ascii=False))
+        return
+    print(json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": text}},
+                     ensure_ascii=False))
 
 
 def ledger_now():
@@ -50,6 +57,21 @@ def state_dir(led, *sub):
     d = os.path.join(led, "hooks", *sub)
     os.makedirs(d, exist_ok=True)
     return d
+
+
+def read_json(path, default):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return default          # 不存在或写坏了：当作空，提醒宁可重复，不能失效
+
+
+def write_json_atomic(path, data):
+    tmp = f"{path}.{os.getpid()}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+    os.replace(tmp, path)
 
 
 def safe_name(s):
@@ -80,19 +102,20 @@ def session_start(root, led, payload):
     if not os.path.exists(os.path.join(led, "ledger.jsonl")):
         return ""
     parts = ["团队账本当前态（会话开始时由钩子自动读取，仅供参考；以 team-ledger.py 实时输出为准）："]
-    rc, stale = run_ledger(root, "stale", "--hours", "0")
-    if rc != 0 and stale:
-        parts += head(stale, 15)
-    rc, owner = run_ledger(root, "owner")
-    if rc != 0 and owner:
-        parts += head(owner, 10)
     try:
         extra, _ = checks.lanes(root, checks.read_events(led))
     except (ValueError, OSError, subprocess.SubprocessError):
         extra = []
-    if extra:
+    if extra:                    # 最需要提醒的放最前面，不被截断
         parts.append("有工作树或分支、但未收口工作项里没登记的线：" + "、".join(extra)
                      + "（docs/rules/并行线.md「三」：开线要落账写分支名）")
+    rc, owner = run_ledger(root, "owner")
+    if rc != 0 and owner:
+        parts += head(owner, 10)
+    rc, stale = run_ledger(root, "stale", "--hours", "0")
+    if rc != 0 and stale:        # 待裁决的已在上面列过，这里不重复
+        parts += head("\n".join(l for l in stale.splitlines() if "→ OWNER" not in l), 15)
+    parts = [p if len(p) <= LINE_LIMIT else p[:LINE_LIMIT - 1] + "…" for p in parts]
     if len(parts) == 1:
         return ""                  # 没有非终态项、待裁决或未登记的线：不注入，不刷屏
     text = "\n".join(parts)
@@ -101,22 +124,31 @@ def session_start(root, led, payload):
 
 # ─────────── H2 写文件后 ───────────
 
-def edited_paths(payload, root):
+def edited_files(payload, base):
+    """被改文件的绝对路径。Claude：file_path / notebook_path；Codex：apply_patch 补丁里的文件行（附录 A）。"""
     ti = payload.get("tool_input") or {}
     raw = []
     if isinstance(ti, dict):
-        if isinstance(ti.get("file_path"), str):
-            raw.append(ti["file_path"])
+        for k in ("file_path", "notebook_path"):
+            if isinstance(ti.get(k), str):
+                raw.append(ti[k])
         if isinstance(ti.get("command"), str) and "*** Begin Patch" in ti["command"]:
             raw += PATCH_FILE_RE.findall(ti["command"])
-    out = []
-    real_root = os.path.realpath(root)
-    for p in raw:
-        full = p if os.path.isabs(p) else os.path.join(payload.get("cwd") or root, p)
-        rel = os.path.relpath(os.path.realpath(full), real_root)
-        if not rel.startswith(".."):
-            out.append(rel)
-    return out
+    return [os.path.realpath(p if os.path.isabs(p) else os.path.join(base, p)) for p in raw]
+
+
+def group_by_root(files):
+    """按被改文件自己所在的仓库分组：线工作树在工程目录之外，不能按会话 cwd 算。"""
+    import checks
+    groups = {}
+    for f in files:
+        d = os.path.dirname(f)
+        while d and not os.path.isdir(d):
+            d = os.path.dirname(d)
+        root = checks.repo_root(d) if d else None
+        if root and os.path.exists(os.path.join(root, ".team-kit.json")):
+            groups.setdefault(os.path.realpath(root), []).append(os.path.relpath(f, os.path.realpath(root)))
+    return groups
 
 
 def check_after_edit_cmd(root):
@@ -127,32 +159,36 @@ def check_after_edit_cmd(root):
         for line in f:
             m = re.match(r"^\s*CHECK_AFTER_EDIT=(.*)$", line)
             if m:
-                parts = shlex.split(m.group(1))
+                parts = shlex.split(m.group(1), comments=True)
                 if len(parts) == 1:          # CHECK_AFTER_EDIT='cmd args' ⇒ 引号内整体是命令串
                     parts = shlex.split(parts[0])
                 return parts or None
     return None
 
 
-def post_tool_use(root, led, payload):
-    paths = edited_paths(payload, root)
-    if not paths:
-        return ""
+def post_tool_use(payload, base):
     notes = []
-    kernel = kernel_files(root)
-    hit = [p for p in paths if p in kernel]
-    if hit:
+    for root, paths in group_by_root(edited_files(payload, base)).items():
+        note = post_tool_use_in_root(root, paths, payload)
+        if note:
+            notes.append(note)
+    return "\n".join(notes)
+
+
+def post_tool_use_in_root(root, paths, payload):
+    import checks
+    led = checks.ledger_dir(root)
+    notes = []
+    hit = [p for p in paths if p in kernel_files(root)]
+    if hit and led:
         seen_file = os.path.join(state_dir(led), f"seen-{safe_name(payload.get('session_id', 'nosession'))}.json")
-        seen = set()
-        if os.path.exists(seen_file):
-            with open(seen_file, encoding="utf-8") as f:
-                seen = set(json.load(f))
-        new = [p for p in hit if p not in seen]
+        seen = {x for x in read_json(seen_file, []) if isinstance(x, str)}
+        key = lambda p: f"{root}::{p}"
+        new = [p for p in hit if key(p) not in seen]
         if new:
             notes.append("、".join(f"`{p}`" for p in new) + " 是 team-kit 内核文件，各工程逐字相同；"
                          "改动要报 team-kit 维护方，不在工程里直接改（AGENTS.md）。")
-            with open(seen_file, "w", encoding="utf-8") as f:
-                json.dump(sorted(seen | set(new)), f, ensure_ascii=False)
+            write_json_atomic(seen_file, sorted(seen | {key(p) for p in new}))
     cmd = check_after_edit_cmd(root)
     if cmd:
         try:
@@ -203,7 +239,11 @@ def main():
     if not isinstance(payload, dict):
         return
     import checks
-    root = checks.repo_root(payload.get("cwd") or os.getcwd())
+    base = payload.get("cwd") if isinstance(payload.get("cwd"), str) else os.getcwd()
+    if event == "PostToolUse":           # 按被改文件所在仓库判断（线工作树在工程目录之外）
+        emit(event, post_tool_use(payload, base))
+        return
+    root = checks.repo_root(base)
     if not root or not os.path.exists(os.path.join(root, ".team-kit.json")):
         return
     led = checks.ledger_dir(root)
@@ -211,7 +251,6 @@ def main():
         return
     handler = {
         "SessionStart": lambda: session_start(root, led, payload),
-        "PostToolUse": lambda: post_tool_use(root, led, payload),
         "SubagentStart": lambda: subagent_start(led, payload),
         "SubagentStop": lambda: subagent_stop(led, payload),
     }.get(event)

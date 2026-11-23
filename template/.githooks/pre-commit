@@ -19,6 +19,7 @@ conf="${root}/.githooks/project.conf"
 # HOOK_CRED_HINT              拒绝时附加的一行指引（本工程凭据放哪、模板叫什么）。
 # CHECK_AFTER_EDIT            （不归本脚本用）写文件后由运行时钩子执行的工程检查命令，被改路径作参数追加；
 #                             非 0 退出时输出作为提醒注入，8 秒超时。见 skills/team-check/SKILL.md。
+#                             值必须整体加引号（本文件会 source project.conf，不加引号会被当命令执行）。
 HOOK_CRED_FILE_RE=""
 HOOK_TEST_PATH_RE=""
 HOOK_CONFIG_PATH_RE=""

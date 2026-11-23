@@ -41,6 +41,19 @@ def cmd_migrations(args):
     if not rel:
         print(f"[team-check] 判不了：没给 --dir，{checks.CONFIG_DOC} 里也没有「数据库迁移」一行")
         sys.exit(2)
+    if args.refs:
+        try:
+            dupes = checks.flyway_dupes_across(repo, rel, args.refs)
+        except ValueError as e:
+            print(f"[team-check] 判不了：{e}")
+            sys.exit(2)
+        if dupes:
+            print(f"[team-check] {' + '.join(args.refs)} 合在一起，{rel} 有重复的迁移版本号：")
+            for v, names in sorted(dupes.items()):
+                print(f"  V{v}: {', '.join(names)}")
+            sys.exit(1)
+        print(f"[team-check] {' + '.join(args.refs)} 合在一起，{rel} 迁移版本号无重复")
+        return
     path = os.path.join(repo, rel)
     if not os.path.isdir(path):
         print(f"[team-check] 判不了：迁移目录不存在 {rel}")
@@ -102,6 +115,8 @@ def main():
     s.add_argument("--deny", nargs="*", default=[])
     m = sub.add_parser("migrations", help="Flyway 迁移版本号是否重复")
     m.add_argument("--dir", default=None)
+    m.add_argument("--refs", nargs="+", default=None,
+                   help="合入前用：把这些分支（如 <集成分支> lane/<短名>）的迁移文件合在一起判重")
     p = sub.add_parser("plan", help="迭代规划是否有并行编排")
     p.add_argument("file")
     sub.add_parser("lanes", help="工作树与账本登记的线是否一致")

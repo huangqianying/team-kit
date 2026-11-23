@@ -176,9 +176,16 @@ def hook(event, payload, env_extra=None, cwd=None):
 
 
 def ctx(r):
+    """提醒文本：additionalContext（会话开始、写文件后）或 reason（子代理结束，decision=block）。"""
     try:
-        return json.loads(r.stdout)["hookSpecificOutput"]["additionalContext"]
-    except (ValueError, KeyError, TypeError):
+        o = json.loads(r.stdout)
+    except ValueError:
+        return ""
+    if isinstance(o, dict) and o.get("decision") == "block":
+        return o.get("reason", "")
+    try:
+        return o["hookSpecificOutput"]["additionalContext"]
+    except (KeyError, TypeError):
         return ""
 
 
@@ -281,10 +288,89 @@ def t_subagent_stop_reminds_once(tmp):
     check("结束后不留开始时间文件", [f for f in hook_files(led) if "/agents/" in f] == [], str(hook_files(led)))
 
 
+def t_session_start_lanes_first(tmp):
+    evs = [{"ts": "2026-11-23 10:00", "role": "pm", "item": f"等裁决很长的工作项名字{i}", "status": "阻塞",
+            "blocker_role": "owner", "blocker": "等负责人裁定一段相当长的说明文字" * 12} for i in range(30)]
+    d, led = kit_project(tmp, evs)
+    git(d, "branch", "lane/unregistered-x")
+    r = hook("SessionStart", {"cwd": d, "session_id": "s", "source": "startup"}, {"TEAM_LEDGER_DIR": led}, cwd=d)
+    c = ctx(r)
+    check("长账本下「未登记的线」仍在注入里", "lane/unregistered-x" in c, c[-300:])
+    check("注入仍 ≤ 2000 字符", len(c) <= 2000, str(len(c)))
+
+
+def t_lane_worktree_edit(tmp):
+    d, led = kit_project(tmp)
+    commit(d, "kit")
+    wt = os.path.join(tmp, "proj.lanes", "a")
+    git(d, "worktree", "add", "-q", "-b", "lane/a", wt)
+    p = {"cwd": d, "session_id": "lw", "hook_event_name": "PostToolUse", "tool_name": "Edit",
+         "tool_input": {"file_path": os.path.join(wt, "AGENTS.md")}, "agent_type": "se", "agent_id": "x"}
+    r = hook("PostToolUse", p, {"TEAM_LEDGER_DIR": led}, cwd=d)
+    check("线工作树里改内核文件也提醒", "AGENTS.md" in ctx(r), r.stdout + r.stderr)
+
+
+def t_subagent_stop_continues_via_block(tmp):
+    d, led = kit_project(tmp)
+    env = {"TEAM_LEDGER_DIR": led}
+    hook("SubagentStart", {"cwd": d, "agent_id": "b1", "agent_type": "qa"}, env, cwd=d)
+    r = hook("SubagentStop", {"cwd": d, "agent_id": "b1", "agent_type": "qa", "stop_hook_active": False}, env, cwd=d)
+    try:
+        o = json.loads(r.stdout)
+    except ValueError:
+        o = {}
+    check("子代理结束提醒用 decision=block + reason（两个宿主都支持）",
+          o.get("decision") == "block" and "还没有落账" in o.get("reason", ""), r.stdout)
+
+
+def t_migrations_refs(tmp):
+    d = new_repo(tmp)
+    write(d, "db/mig/V1__a.sql", "")
+    commit(d, "v1")
+    git(d, "checkout", "-q", "-b", "lane/a")
+    write(d, "db/mig/V2__lane.sql", "")
+    commit(d, "lane")
+    git(d, "checkout", "-q", "-")
+    write(d, "db/mig/V2__main.sql", "")
+    commit(d, "main")
+    main = git(d, "rev-parse", "--abbrev-ref", "HEAD")
+    r = run(["migrations", "--dir", "db/mig"], d)
+    check("单看集成分支查不出跨分支撞号（说明为何需要 --refs）", r.returncode == 0, out(r))
+    r = run(["migrations", "--dir", "db/mig", "--refs", main, "lane/a"], d)
+    check("--refs 对照两边查出 V2 撞号", r.returncode == 1 and "V2" in out(r), out(r))
+
+
+def t_seen_file_corrupt_still_warns(tmp):
+    d, led = kit_project(tmp)
+    os.makedirs(os.path.join(led, "hooks"), exist_ok=True)
+    open(os.path.join(led, "hooks", "seen-cz.json"), "w").write("[\"AGE")
+    p = {"cwd": d, "session_id": "cz", "tool_name": "Edit", "tool_input": {"file_path": os.path.join(d, "AGENTS.md")}}
+    r = hook("PostToolUse", p, {"TEAM_LEDGER_DIR": led}, cwd=d)
+    check("状态文件写坏仍提醒", "AGENTS.md" in ctx(r), r.stdout + r.stderr)
+
+
+def t_check_after_edit_trailing_comment(tmp):
+    d, led = kit_project(tmp)
+    write(d, ".githooks/project.conf", "CHECK_AFTER_EDIT='sh -c \"echo bad2; exit 1\"'  # 工程检查\n")
+    p = {"cwd": d, "session_id": "tc", "tool_name": "Write", "tool_input": {"file_path": os.path.join(d, "README.md")}}
+    r = hook("PostToolUse", p, {"TEAM_LEDGER_DIR": led}, cwd=d)
+    check("CHECK_AFTER_EDIT 行尾带注释也能执行", "bad2" in ctx(r), r.stdout + r.stderr)
+
+
+def t_notebook_path(tmp):
+    d, led = kit_project(tmp)
+    p = {"cwd": d, "session_id": "nb", "tool_name": "NotebookEdit",
+         "tool_input": {"notebook_path": os.path.join(d, "AGENTS.md")}}
+    r = hook("PostToolUse", p, {"TEAM_LEDGER_DIR": led}, cwd=d)
+    check("NotebookEdit 的 notebook_path 也能识别", "AGENTS.md" in ctx(r), r.stdout + r.stderr)
+
+
 ALL = [t_scope, t_migrations, t_migration_dir_from_config, t_plan, t_lanes,
        t_hook_bad_input_is_silent, t_session_start_injects_ledger, t_session_start_outside_kit_project,
        t_kernel_edit_warns_once_per_session, t_codex_apply_patch_paths, t_check_after_edit,
-       t_subagent_stop_reminds_once]
+       t_subagent_stop_reminds_once, t_session_start_lanes_first, t_lane_worktree_edit,
+       t_subagent_stop_continues_via_block, t_migrations_refs, t_seen_file_corrupt_still_warns,
+       t_check_after_edit_trailing_comment, t_notebook_path]
 
 
 def main():
