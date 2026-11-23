@@ -188,6 +188,23 @@ def t_diff_impact_in_kernel():
         ok(s in text, f"diff-impact 写了「{s}」")
 
 
+def _section(text, start, stop="\n## "):
+    return text.split(start, 1)[-1].split(stop, 1)[0] if start in text else ""
+
+
+def t_diff_impact_referenced():
+    rd = lambda rel: open(os.path.join(kit.TEMPLATE, rel), encoding="utf-8").read()
+    c = _section(rd("docs/rules/团队协作契约.md"), "### 2.1", "\n### ")
+    ok("skills/diff-impact" in c, "契约 §2.1 引用 diff-impact")
+    ok("已有" in c.split("skills/diff-impact", 1)[0].rsplit("\n", 1)[-1], "契约那句限定在已有改动时")
+    lanes = rd("docs/rules/并行线.md")
+    ok("skills/diff-impact" in _section(lanes, "## 五、合入集成分支"), "并行线「五」引用 diff-impact")
+    six = _section(lanes, "## 六、测试服与验收")
+    ok("skills/diff-impact" in six and "影响分析" in six, "并行线「六」引用 diff-impact 并说存报告")
+    md = rd("skills/manage-docs/SKILL.md")
+    ok("影响分析" in md and "skills/diff-impact" in md, "manage-docs 写了影响分析的落位")
+
+
 def t_sync_refuses_local_edit_and_force_overrides():
     d = new_repo()
     run("install", d)
