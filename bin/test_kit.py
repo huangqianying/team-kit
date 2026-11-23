@@ -125,6 +125,18 @@ def t_kernel_config_refs_are_profile_sections():
     ok(not missing, f"内核引用的工程配置节都在 profile 里（缺：{sorted(missing)}）")
 
 
+DISPATCH_RULE = "docs/rules/派活与交付.md"
+
+
+def t_dispatch_rule_in_kernel():
+    files, _ = kit.kernel_files()
+    ok(DISPATCH_RULE in files, "派活与交付.md 在内核清单里")
+    p = os.path.join(kit.TEMPLATE, DISPATCH_RULE)
+    text = open(p, encoding="utf-8").read() if os.path.exists(p) else ""
+    for sec in ["一、派活单", "二、回报", "三、spec+plan 必须写明", "四、证据", "五、旧失败"]:
+        ok(f"## {sec}" in text, f"派活与交付.md 有「{sec}」一节")
+
+
 def t_sync_refuses_local_edit_and_force_overrides():
     d = new_repo()
     run("install", d)
