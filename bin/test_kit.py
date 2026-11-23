@@ -186,21 +186,38 @@ def t_diff_impact_in_kernel():
     for s in ["静态分析，未运行测试", "证据确定性", "team-check.py migrations --refs",
               "§4.1", "docs/tests/<版本>/影响分析-<工作项>.md", "commit:path"]:
         ok(s in text, f"diff-impact 写了「{s}」")
+    lane = text.split("**线的模式**", 1)[-1].split("\n\n", 1)[0] if "**线的模式**" in text else ""
+    for s in ["不能直接对比", "实际用的基准 sha", "merge-tree --write-tree", "交集"]:
+        ok(s in lane, f"「线的模式」写了「{s}」")
+    seven = text.split("## 七、不是什么", 1)[-1] if "## 七、不是什么" in text else ""
+    for s in ["不是评审结论", "不是测试证据", "派活与交付.md"]:
+        ok(s in seven, f"「七、不是什么」写了「{s}」")
 
 
 def _section(text, start, stop="\n## "):
     return text.split(start, 1)[-1].split(stop, 1)[0] if start in text else ""
 
 
+def _lines_with(text, token):
+    return [l for l in text.splitlines() if token in l]
+
+
 def t_diff_impact_referenced():
     rd = lambda rel: open(os.path.join(kit.TEMPLATE, rel), encoding="utf-8").read()
     c = _section(rd("docs/rules/团队协作契约.md"), "### 2.1", "\n### ")
     ok("skills/diff-impact" in c, "契约 §2.1 引用 diff-impact")
-    ok("已有" in c.split("skills/diff-impact", 1)[0].rsplit("\n", 1)[-1], "契约那句限定在已有改动时")
+    cl = _lines_with(c, "skills/diff-impact")
+    ok(bool(cl) and all("已有改动可分析的" in l and "不论" not in l and "无论" not in l for l in cl),
+       "契约那句限定在已有改动可分析时")
     lanes = rd("docs/rules/并行线.md")
-    ok("skills/diff-impact" in _section(lanes, "## 五、合入集成分支"), "并行线「五」引用 diff-impact")
+    five = _section(lanes, "## 五、合入集成分支")
+    ok("skills/diff-impact" in five, "并行线「五」引用 diff-impact")
     six = _section(lanes, "## 六、测试服与验收")
     ok("skills/diff-impact" in six and "影响分析" in six, "并行线「六」引用 diff-impact 并说存报告")
+    for name, sec in (("契约 §2.1", c), ("并行线「五」", five), ("并行线「六」", six)):
+        ls = _lines_with(sec, "skills/diff-impact")
+        ok(bool(ls) and all("可以" in l and "必须" not in l and "须用" not in l for l in ls),
+           f"{name} 引用 diff-impact 的句子写「可以」、不强制")
     md = rd("skills/manage-docs/SKILL.md")
     ok("影响分析" in md and "skills/diff-impact" in md, "manage-docs 写了影响分析的落位")
 
