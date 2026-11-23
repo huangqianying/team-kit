@@ -1,0 +1,49 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "sh -c 'r=$(git rev-parse --show-toplevel 2>/dev/null) && [ -f \"$r/skills/team-check/hook.py\" ] && python3 \"$r/skills/team-check/hook.py\" SessionStart; exit 0'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "sh -c 'r=$(git rev-parse --show-toplevel 2>/dev/null) && [ -f \"$r/skills/team-check/hook.py\" ] && python3 \"$r/skills/team-check/hook.py\" PostToolUse; exit 0'"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "sh -c 'r=$(git rev-parse --show-toplevel 2>/dev/null) && [ -f \"$r/skills/team-check/hook.py\" ] && python3 \"$r/skills/team-check/hook.py\" SubagentStart; exit 0'"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "sh -c 'r=$(git rev-parse --show-toplevel 2>/dev/null) && [ -f \"$r/skills/team-check/hook.py\" ] && python3 \"$r/skills/team-check/hook.py\" SubagentStop; exit 0'"
+          }
+        ]
+      }
+    ]
+  }
+}

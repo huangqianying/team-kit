@@ -12,5 +12,53 @@
       "MultiEdit"
     ],
     "deny": []
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/skills/team-check/hook.py\" ] && python3 \"$CLAUDE_PROJECT_DIR/skills/team-check/hook.py\" SessionStart; exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/skills/team-check/hook.py\" ] && python3 \"$CLAUDE_PROJECT_DIR/skills/team-check/hook.py\" PostToolUse; exit 0"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/skills/team-check/hook.py\" ] && python3 \"$CLAUDE_PROJECT_DIR/skills/team-check/hook.py\" SubagentStart; exit 0"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/skills/team-check/hook.py\" ] && python3 \"$CLAUDE_PROJECT_DIR/skills/team-check/hook.py\" SubagentStop; exit 0"
+          }
+        ]
+      }
+    ]
   }
 }

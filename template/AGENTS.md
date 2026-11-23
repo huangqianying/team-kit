@@ -127,3 +127,4 @@
 
 - 不提交真实密钥或机器相关路径；本地与部署凭据只放各自的不入库文件（见工程配置「部署」）。
 - `.githooks/pre-commit` 拦截凭据文件与明文口令；**新克隆的仓库须先执行 `bash .githooks/install.sh`**，否则钩子不生效。
+- **运行时钩子只提醒、不拦截**（`skills/team-check/SKILL.md`）：Claude Code（`.claude/settings.json`）与 Codex（`.codex/hooks.json`）在会话开始时注入账本当前态，改到内核文件时提醒，团队角色子代理没落账就结束时提醒一次。**Codex 第一次在本工程使用前，要在 Codex 里执行 `/hooks` 审阅并信任**；钩子配置不变就不用再信任。

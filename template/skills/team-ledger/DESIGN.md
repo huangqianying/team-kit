@@ -94,3 +94,5 @@ PM / UI / SE / QA 是 SA 值守会话的 **subagent**：任务由 SA 直接派�
 - 账本不替代角色产物（需求文档、设计、spec+plan、方案+用例、测试报告）；它是**状态索引**，指向而不复制那些产物。评审结论只落账本（`--decision` ＋ `--note`）。**DoD ＝ 产物已提交 ＋ 账本落终态**（契约「评审与合入」）。
 - 两类工作分账：产品开发带产品版本号；工程基建带 `--version _infra`（见 `AGENTS.md`）。
 - **不在射程内的别往回加**。`test_team_ledger.py` 里有两组反向判据，钉住 9 个不要的子命令（`show` / `render` / `log` / `owed` / `items` / `archive` / `set-version` / `verify-artifact` / `verify-candidate`）与 4 个落锚参数（`--artifact` / `--at` / `--candidate` / `--job`）必须报错 —— 要加回来，先改那两条判据。
+
+**提交号硬拒（R1–R3，v0.10.0）**：落账引用的提交必须真实存在，规则与例外见 `SKILL.md`「怎么落账」。核对在调用方所在仓库进行（环境变量 `TEAM_LEDGER_GIT_DIR` 可指定），各工作树共用对象库，线分支上的提交也查得到；判不了（不是 git 仓库、没有 git）只警告不拒——与「判不了 ≠ 全清」同一口径，环境问题不能把落账卡死。事件新增字段 `base`（起点提交）与 `no_commit`（没有产物的理由）。

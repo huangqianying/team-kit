@@ -137,6 +137,25 @@ def t_dispatch_rule_in_kernel():
         ok(f"## {sec}" in text, f"派活与交付.md 有「{sec}」一节")
 
 
+def t_hooks_wired():
+    import json
+    s = json.load(open(os.path.join(kit.TEMPLATE, ".claude/settings.json"), encoding="utf-8"))
+    cp = os.path.join(kit.TEMPLATE, ".codex/hooks.json")
+    c = json.load(open(cp, encoding="utf-8")) if os.path.exists(cp) else {"hooks": {}}
+    for name, cfg in (("claude", s), ("codex", c)):
+        hooks = cfg.get("hooks", {})
+        for ev in ("SessionStart", "PostToolUse", "SubagentStart", "SubagentStop"):
+            hs = [h for g in hooks.get(ev, []) for h in g.get("hooks", [])]
+            ok(any("skills/team-check/hook.py" in h.get("command", "") and ev in h.get("command", "") for h in hs),
+               f"{name} 挂了 {ev}")
+            ok(bool(hs) and all(h.get("timeout") == 10 for h in hs), f"{name} {ev} 超时 10 秒")
+    pt = [g.get("matcher", "") for g in s.get("hooks", {}).get("PostToolUse", [])]
+    ok(pt == ["Write|Edit|NotebookEdit"], f"claude PostToolUse matcher 为 Write|Edit|NotebookEdit（{pt}）")
+    cpt = [g.get("matcher", "") for g in c.get("hooks", {}).get("PostToolUse", [])]
+    ok(cpt == ["apply_patch"], f"codex PostToolUse matcher 只挂 apply_patch（{cpt}）")
+    ok(".codex/hooks.json" in kit.kernel_files()[0], ".codex/hooks.json 在内核清单里")
+
+
 def t_dispatch_rule_referenced():
     need = ["docs/rules/团队协作契约.md", "docs/rules/双端协作与交接.md",
             "docs/rules/roles/pm.md", "docs/rules/roles/ui.md",

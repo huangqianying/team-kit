@@ -22,6 +22,7 @@ docs/rules/roles/qa.md
 .codex/agents/se.toml
 .codex/agents/qa.toml
 .codex/config.toml
+.codex/hooks.json
 skills/team-ledger/
 skills/team-check/
 skills/sa-review/

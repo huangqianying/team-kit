@@ -30,7 +30,7 @@ description: Use when SA reviews requirement documents (technical opinion), spec
 ## 四、spec+plan 与回报的核对
 
 - 评 spec + plan 时，核测试落点，以及每个任务的「覆盖」「依赖」两个字段（`docs/rules/派活与交付.md`「三」）。测试落点的意见与其他意见一样是建议级。
-- 收回报时，核实际改动是否全部落在派活单的可写范围内、没碰禁写范围（`派活与交付.md`「二」）。
+- 收回报时，核实际改动是否全部落在派活单的可写范围内、没碰禁写范围（`docs/rules/派活与交付.md`「二」）。可以用 `python3 skills/team-check/team-check.py scope --base <起点> --commits <提交…> --allow <可写…> [--deny <禁写…>]`。
 
 ## 五、评审与勘误
 

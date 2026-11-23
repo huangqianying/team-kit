@@ -32,8 +32,15 @@ python3 skills/team-ledger/team-ledger.py append \
   --status <进行中|待评审|评审中|阻塞|完成|交接> \
   [--round N] [--decision APPROVED|CR] \
   [--to pm|ui|se|qa|sa|owner] [--blocker-role …] [--blocker "卡在什么"] \
-  [--note "一句话摘要"] [--version <版本>|_infra]
+  [--note "一句话摘要"] [--version <版本>|_infra] \
+  [--base <起点提交>] [--no-commit "没有产物的理由"]
 ```
+
+**提交号硬拒（R1–R3）**：落账引用的提交必须在仓库里真实存在（`git cat-file -e` 核对；当前目录不是 git 仓库或没有 git 时只警告、照常落账）。
+- **R1**：pm / ui / se / qa 落 `待评审`，`--note` 里要有一个存在的提交号，**另有**一个被评产物的路径（不必紧挨着写，如 `a1b2c3d4 docs/designs/v1/x.md`）。
+- **R2**：pm / ui / se / qa 落 `完成` / `交接`，`--note` 里要有一个存在的提交号。**没有产物的工作**（只读排查、运维、咨询）用 `--no-commit "理由"` 写明——这是正常用法，不是绕过。
+- **R3**：SA 给 SE 派开发活（`--status 交接 --to se --phase dev`）时，这个（工作项，子产物）第一次必须带 `--base <起点提交>`（`docs/rules/派活与交付.md`「一」）。之后返工再派不必重复；`stale` 在该项各行末尾显示 `起点 <提交前 8 位>`。
+- SA 不受 R1、R2 约束（SA 的待评审、完成多是登记、裁定、合入）；契约要求被评产物以 `commit:path` 指认，照旧是规则。
 
 - `--role` 填**你自己的角色**。`--item` 同一工作项跨状态**保持同名**（当前态按 `(role,item,part)` 取最新）。
 - **同一工作项内并行的子产物必须带 `--part <子产物名>`**（如主线 SE 开发时，PM 澄清其中一份子产物）：子线的 `交接` / `完成` 只收它自己那一行，不会让整项收口、把主线的「进行中」折叠掉；`stale` 显示为 `工作项/子产物`。整项只在**主线**落 `完成` 时收口，`交接` 不收口整项。
