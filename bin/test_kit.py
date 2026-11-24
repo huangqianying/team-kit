@@ -516,6 +516,34 @@ def t_check_warns_missing_when_column():
     ok(kit.WHEN_COL_WARN in warns, "「项目规范」有节无表也警告")
     shutil.rmtree(d)
 
+
+def t_reading_rules_use_index():
+    rd = lambda rel: open(os.path.join(kit.TEMPLATE, rel), encoding="utf-8").read()
+    item = lambda text, n: next((l for l in text.splitlines() if l.startswith(f"{n}. ")), "")
+    se, pm, qa = rd("docs/rules/roles/se.md"), rd("docs/rules/roles/pm.md"), rd("docs/rules/roles/qa.md")
+    for name, t in (("se", se), ("pm", pm), ("qa", qa)):
+        ok("何时读" in item(t, 2), f"{name}.md 第 2 条按「何时读」读项目规范")
+    s4 = item(se, 4)
+    ok(all(x in s4 for x in ["按需阅读", "新增页面", "通读", "本工程实例", "整份"]),
+       "se.md 第 4 条：按需阅读、新增页面通读、实例整份读")
+    p4 = item(pm, 4)
+    ok(all(x in p4 for x in ["按需阅读", "审原型", "通读"]) and "界面" in p4,
+       "pm.md 第 4 条：审原型和审界面通读，写需求按需阅读")
+    ls = _lines_with(se, "自查")
+    ok(bool(ls) and all("按需阅读" in l for l in ls), "se.md 快速链路自查一句引用按需阅读")
+    c50 = next((l for l in rd("docs/rules/团队协作契约.md").splitlines() if l.startswith("| 2 开发 |")), "")
+    ok("按需阅读" in c50, "契约快速链路第 2 棒自查引用按需阅读")
+    a33 = _section(rd("AGENTS.md"), "### 3.3", "\n### ")
+    ok("按需阅读" in a33 and "何时读" in a33, "AGENTS §3.3 写了按需阅读与何时读")
+    di = next((l for l in rd(DIFF_IMPACT).splitlines() if l.startswith("1. **读上下文。**")), "")
+    ok("何时读" in di and "按需阅读" in di, "diff-impact 第 1 步按何时读与按需阅读")
+    ok("按需阅读" not in rd("docs/rules/roles/ui.md"), "ui.md 不改（出原型通读全文）")
+    stale = ["列给 SE 的必读", "列给 QA 的必读", "列给 PM 的必读", "各角色必读范围",
+             "涉及前端时必读", "涉及界面时必读", "UI设计规范.md` 自查"]
+    hits = [(rel, s) for rel in kit.kernel_files()[0] if rel.endswith(".md")
+            for s in stale if s in rd(rel)]
+    ok(hits == [], f"内核里不再有旧措辞（{hits}）")
+
 def t_adopt_three_way_merges_disjoint_edits():
     with temp_kit() as k:
         d = new_repo()
