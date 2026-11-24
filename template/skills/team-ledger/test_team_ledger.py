@@ -222,6 +222,19 @@ def t_owner(tmp):
     check("卡在 subagent 的不进待裁决清单", "等SA的" not in r.stdout)
 
 
+def t_owner_via_to(tmp):
+    """非阻塞状态用 --to owner 交给负责人（如 SA 落「待评审 --to owner」请负责人验收），也在等人。
+    stale 把它标成「→ OWNER」，owner 清单也得列它，否则两边都不出现在会话开始的注入里。"""
+    env = mkenv(tmp)
+    append(env, role="sa", item="等验收的", status="待评审", to="owner", note="请负责人验收")
+    append(env, role="sa", item="交给SE的", status="待评审", to="se", note="x")
+    append(env, role="sa", item="已交接的", status="交接", to="owner", note="终态")
+    r = run(env, "owner")
+    check("待评审 --to owner 进待裁决清单", r.returncode == 1 and "等验收的" in r.stdout, out(r)[:200])
+    check("--to 其他角色的不进", "交给SE的" not in r.stdout, out(r)[:200])
+    check("终态（交接）的不进", "已交接的" not in r.stdout, out(r)[:200])
+
+
 def t_owner_closed(tmp):
     """只看当前态——否则清单会被已收口的历史项淹掉，真待裁决的项反而看不见。"""
     env = mkenv(tmp)
@@ -505,7 +518,7 @@ def t_r2_error_hints_separator(tmp):
 ALL = [t_append, t_version_missing, t_reject, t_successor_required, t_owner_successor,
        t_item_clash, t_item_clash_scope, t_force_new_item,
        t_stale_quiet, t_stale_hours0, t_stale_owner_tag, t_stale_bad_ts, t_bad_line,
-       t_owner, t_owner_closed, t_concurrent,
+       t_owner, t_owner_via_to, t_owner_closed, t_concurrent,
        t_removed_subcommands, t_removed_anchor_flags, t_no_md,
        t_ui_phase_alias, t_utc_offset,
        t_handoff_does_not_fold, t_complete_still_folds, t_part_rows, t_part_owner_and_validation,

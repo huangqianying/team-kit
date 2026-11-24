@@ -340,6 +340,37 @@ def t_migrations_refs(tmp):
     check("--refs 对照两边查出 V2 撞号", r.returncode == 1 and "V2" in out(r), out(r))
 
 
+def t_migrations_refs_missing_dir(tmp):
+    """目录在所有分支上都不存在 ⇒ 判不了（退 2），不能报「无重复」。只在一边存在照常判。"""
+    d = new_repo(tmp)
+    write(d, "db/mig/V1__a.sql", "")
+    commit(d, "v1")
+    git(d, "branch", "lane/a")
+    main = git(d, "rev-parse", "--abbrev-ref", "HEAD")
+    r = run(["migrations", "--dir", "db/nope", "--refs", main, "lane/a"], d)
+    check("--refs 目录都不存在 → 判不了退 2", r.returncode == 2 and "判不了" in out(r), out(r))
+    git(d, "checkout", "-q", "--orphan", "lane/empty")
+    git(d, "rm", "-rq", "--cached", ".")
+    write(d, "x.txt", "")
+    git(d, "add", "x.txt")
+    commit(d, "empty")
+    git(d, "checkout", "-q", "-f", main)
+    r = run(["migrations", "--dir", "db/mig", "--refs", main, "lane/empty"], d)
+    check("--refs 只在一边存在 → 照常判、无重复退 0", r.returncode == 0, out(r))
+
+
+def t_session_start_owner_via_to(tmp):
+    evs = [{"ts": "2026-11-23 10:00", "role": "sa", "item": "请负责人验收", "status": "待评审", "to": "owner"},
+           {"ts": "2026-11-23 10:00", "role": "sa", "item": "等他裁", "status": "阻塞", "blocker_role": "owner",
+            "blocker": "x"}]
+    d, led = kit_project(tmp, evs)
+    r = hook("SessionStart", {"cwd": d, "session_id": "s1", "hook_event_name": "SessionStart", "source": "startup"},
+             {"TEAM_LEDGER_DIR": led}, cwd=d)
+    c = ctx(r)
+    check("待评审 --to owner 出现在会话注入里", "请负责人验收" in c, c)
+    check("阻塞 → owner 只出现一次", c.count("等他裁") == 1, c)
+
+
 def t_seen_file_corrupt_still_warns(tmp):
     d, led = kit_project(tmp)
     os.makedirs(os.path.join(led, "hooks"), exist_ok=True)
@@ -370,7 +401,8 @@ ALL = [t_scope, t_migrations, t_migration_dir_from_config, t_plan, t_lanes,
        t_kernel_edit_warns_once_per_session, t_codex_apply_patch_paths, t_check_after_edit,
        t_subagent_stop_reminds_once, t_session_start_lanes_first, t_lane_worktree_edit,
        t_subagent_stop_continues_via_block, t_migrations_refs, t_seen_file_corrupt_still_warns,
-       t_check_after_edit_trailing_comment, t_notebook_path]
+       t_check_after_edit_trailing_comment, t_notebook_path, t_migrations_refs_missing_dir,
+       t_session_start_owner_via_to]
 
 
 def main():

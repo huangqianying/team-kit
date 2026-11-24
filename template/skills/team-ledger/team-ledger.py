@@ -433,7 +433,7 @@ def cmd_stale(a):
 
     def _tail(e):
         """接续方 ＋ 卡点：非终态行的意义全在「棒在谁手里」。"""
-        who = e.get("blocker_role") if e.get("status") == "阻塞" else e.get("to")
+        who = _successor(e)
         bits = []
         if who:
             bits.append("→ OWNER（等人裁决，不派 subagent）" if who == OWNER_ROLE
@@ -466,10 +466,16 @@ def cmd_stale(a):
     print(f"[team-ledger] 无停滞项（阈值 {a.hours}h）")
 
 
+def _successor(e):
+    """接续方：阻塞看 blocker_role，其余看 to（与 append 的校验口径一致）。"""
+    return e.get("blocker_role") if e.get("status") == "阻塞" else e.get("to")
+
+
 def cmd_owner(a):
     """待裁决清单：当前仍卡在产品负责人手上的项。
 
-    `--blocker-role owner` 的接续方是产品负责人、不是 subagent，只能等人。
+    接续方是产品负责人（`阻塞 --blocker-role owner`，或其他非终态 `--to owner`，口径同 stale 的「→ OWNER」）：
+    不是 subagent，只能等人。
     只列**当前态**仍非终态者——已收口的不再列，否则清单会被历史项淹掉。
 
     退出码：0=无待裁决  1=有待裁决
@@ -479,13 +485,13 @@ def cmd_owner(a):
     closed = _closed_items(events)
     rows = [(e.get("ts", ""), role, _label(item, part), e)
             for (role, item, part), e in _current(events).items()
-            if e.get("blocker_role") == OWNER_ROLE
+            if _successor(e) == OWNER_ROLE
             and e.get("status") not in TERMINAL and item not in closed]
     if not rows:
         print("[team-ledger] 无待产品负责人裁决的项")
         return
     rows.sort(key=lambda r: r[:3])
-    print(f"[team-ledger] {len(rows)} 项待你裁决——这些阻塞的接续方是产品负责人，不是 subagent，只能等人：")
+    print(f"[team-ledger] {len(rows)} 项待你裁决——这些项的接续方是产品负责人，不是 subagent，只能等人：")
     for ts, role, item, e in rows:
         age = _hours_since(ts)
         aged = f"（挂 {age:.0f}h）" if age is not None else ""

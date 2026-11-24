@@ -194,6 +194,16 @@ def t_diff_impact_in_kernel():
         ok(s in seven, f"「七、不是什么」写了「{s}」")
 
 
+def t_hook_wording_matches_subagent_stop():
+    """子代理结束提醒会让子代理再走一轮（decision: block），说明文字不能还写「只提醒、绝不拦截」。"""
+    agents = open(os.path.join(kit.TEMPLATE, "AGENTS.md"), encoding="utf-8").read()
+    line = next((l for l in agents.splitlines() if "运行时钩子" in l), "")
+    ok("再走一轮" in line and "只提醒、不拦截" not in line, "AGENTS.md 钩子一条写明子代理会再走一轮")
+    hook = open(os.path.join(kit.TEMPLATE, "skills/team-check/hook.py"), encoding="utf-8").read()
+    doc = hook.split('"""', 2)[1] if hook.count('"""') >= 2 else ""
+    ok("绝不拦截" not in doc and "decision" in doc, "hook.py 头注写明子代理结束的 decision 输出")
+
+
 def _section(text, start, stop="\n## "):
     return text.split(start, 1)[-1].split(stop, 1)[0] if start in text else ""
 

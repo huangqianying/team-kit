@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""两个宿主（Claude Code、Codex）共用的钩子入口：只提醒，绝不拦截。
+"""两个宿主（Claude Code、Codex）共用的钩子入口：不拦截写入，出错一律放行。
 
 用法：python3 skills/team-check/hook.py <SessionStart|PostToolUse|SubagentStart|SubagentStop>
 stdin 是宿主传来的 JSON；需要提醒时输出
   {"hookSpecificOutput": {"hookEventName": <事件>, "additionalContext": <文本>}}
+唯一例外是 SubagentStop：团队角色子代理没落账就结束时输出 {"decision": "block", "reason": <提醒>}，
+让它再走一轮去落账，只一次（第二次结束直接放行）。
 不需要提醒时什么都不输出。任何异常都吞掉、退出码一律 0：钩子出错不能拖慢或打断会话。
 宿主输入格式的实测见 docs/superpowers/specs/2026-11-23-check-mechanisms-design.md 附录 A（team-kit 仓库）。
 """
