@@ -452,6 +452,39 @@ def t_demo_breakpoints_match_spec():
     ok(widths(spec) <= allowed, f"规范正文示例里的 @media 断点都在 §4.1 断点阶内（多出 {sorted(widths(spec) - allowed)}）")
 
 
+UI_SPEC = "docs/rules/UI设计规范.md"
+
+
+def _ui_index(text):
+    return _section(text, "\n## 按需阅读\n")
+
+
+def _spec_numbers(text):
+    import re
+    return set(re.findall(r"^#{2,4} (\d+(?:\.\d+)*)\.?\s", text, re.M))
+
+
+def t_ui_spec_reading_index():
+    import re
+    spec = open(os.path.join(kit.TEMPLATE, UI_SPEC), encoding="utf-8").read()
+    ok("\n## 按需阅读\n" in spec, "UI 设计规范有「按需阅读」一节")
+    ok("## 按需阅读" in spec and spec.index("## 按需阅读") < spec.index("\n## 0. "), "「按需阅读」在 §0 之前")
+    idx = _ui_index(spec)
+    ok(not any(l.startswith("#") for l in idx.splitlines()), "索引节里没有标题行")
+    for s in ["拿不准", "读全文", "本工程实例", "整份", "出原型", "审原型", "新增页面"]:
+        ok(s in idx, f"索引写了「{s}」")
+    nums = _spec_numbers(spec)
+    ok({str(i) for i in range(25)} <= nums, f"正文节号解析到 §0–§24（共 {len(nums)} 个）")
+    refs = re.findall(r"§(\d+(?:\.\d+)*)", idx)
+    ok(bool(refs) and all(r in nums for r in refs), f"索引引用的节号都存在（多出 {sorted(set(refs) - nums)}）")
+    rows = "\n".join(l for l in idx.splitlines() if l.startswith("|"))
+    whole = set(re.findall(r"§(\d+)(?![\d.])", rows))
+    want = {str(i) for i in range(25)}
+    ok(whole == want, f"§0–§24 在表格里都整节出现（缺 {sorted(want - whole, key=int)}）")
+    always = _section(idx, "**每次都读**", "**按任务再读**")
+    ok(set(re.findall(r"§(\d+(?:\.\d+)*)", always)) == {"0", "1", "2.4", "4", "20", "21", "22"},
+       "「每次都读」恰为 §0、§1、§2.4、§4、§20、§21、§22")
+
 def t_adopt_three_way_merges_disjoint_edits():
     with temp_kit() as k:
         d = new_repo()
