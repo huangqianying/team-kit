@@ -486,6 +486,24 @@ def t_ui_spec_reading_index():
        "「每次都读」恰为 §0、§1、§2.4、§4、§20、§21、§22")
 
 
+
+def t_ui_index_review_fixes():
+    """整体审阅查出的路由缺口：列表页结构、按钮的确认与提交态、表单提交态、顺着引用读、子节含其下小节。"""
+    import re
+    idx = _ui_index(open(os.path.join(kit.TEMPLATE, UI_SPEC), encoding="utf-8").read())
+    row = lambda name: next((l for l in idx.splitlines() if l.startswith(f"| {name} |")), "")
+    refs = lambda name: set(re.findall(r"§(\d+(?:\.\d+)*)(?![\d.])", row(name)))
+    ok("10" in refs("表格、列表页"), f"「表格、列表页」整节读 §10（{sorted(refs('表格、列表页'))}）")
+    ok({"15.3", "18.2"} <= refs("按钮、操作列"), f"「按钮、操作列」读 §15.3、§18.2（{sorted(refs('按钮、操作列'))}）")
+    ok("18" in refs("表单、输入"), f"「表单、输入」整节读 §18（{sorted(refs('表单、输入'))}）")
+    xref = [l for l in idx.splitlines() if "引用" in l and "一并读" in l]
+    ok(bool(xref) and any("§22" in l for l in xref), "索引写明：§22 或已读节引用的别处，涉及时一并读")
+    note = next((l for l in idx.splitlines() if "§N.M" in l), "")
+    ok("其下" in note, f"写法一句说明 §N.M 含其下各小节（{note}）")
+    t = open(os.path.join(kit.PROFILE, kit.PROFILE_DOC), encoding="utf-8").read()
+    ui = [l for l in _section(t, "## 项目规范").splitlines() if "UI 只" in l or "UI 从" in l]
+    ok(bool(ui) and all("技术栈" in l and "主题" in l for l in ui), "工程配置写明 UI 从表里取技术栈与主题")
+
 def t_profile_template_has_when_column():
     t = open(os.path.join(kit.PROFILE, kit.PROFILE_DOC), encoding="utf-8").read()
     sec = _section(t, "## 项目规范")
