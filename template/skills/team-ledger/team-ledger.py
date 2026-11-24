@@ -302,12 +302,19 @@ def cmd_append(a):
         successor, flag = ((a.blocker_role, "--blocker-role") if a.status == "阻塞"
                            else (a.to, "--to"))
         if not successor:
+            owner_hint = (f"交接是终态，写 --to {OWNER_ROLE} 也不进待裁决清单、不进 stale；"
+                          f"要等产品负责人处理，改落 `阻塞 --blocker-role {OWNER_ROLE}` 或 `待评审 --to {OWNER_ROLE}`。"
+                          if a.status == "交接" else
+                          f"接续方是产品负责人（不是 subagent）时写 {flag} {OWNER_ROLE}，"
+                          f"该项会进待裁决清单（`team-ledger.py owner`）。")
             sys.exit(f"status={a.status} 必须用 {flag} 指定接续方——"
-                     f"落账不派活，接续方是给 SA 看的状态标记；不写 SA 就不知道这棒该派给谁。\n"
-                     f"接续方是产品负责人（不是 subagent）时写 {flag} {OWNER_ROLE}，"
-                     f"该项会进待裁决清单（`team-ledger.py owner`）。")
+                     f"落账不派活，接续方是给 SA 看的状态标记；不写 SA 就不知道这棒该派给谁。\n{owner_hint}")
         if successor != OWNER_ROLE and successor not in ROLES:
             sys.exit(f"{flag} 取值非法：{successor}（须 ∈ {sorted(ROLES)} 或 {OWNER_ROLE}）")
+        if a.status == "交接" and successor == OWNER_ROLE:
+            print(f"[team-ledger] 警告：交接是终态，交接 --to {OWNER_ROLE} 不进待裁决清单、不进 stale，"
+                  f"负责人和 SA 都不会再看到它。要等负责人处理（验收、裁定），"
+                  f"改落 `阻塞 --blocker-role {OWNER_ROLE}` 或 `待评审 --to {OWNER_ROLE}`。本次照常落账", file=sys.stderr)
     phase = _norm_phase(a.phase)
     if phase and phase not in PHASES:
         sys.exit(f"phase 非法：{a.phase}（须 ∈ 链路阶段 {sorted(PHASES)}；中文阶段名会自动归一）")

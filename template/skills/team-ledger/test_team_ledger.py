@@ -235,6 +235,20 @@ def t_owner_via_to(tmp):
     check("终态（交接）的不进", "已交接的" not in r.stdout, out(r)[:200])
 
 
+def t_handoff_to_owner_warns(tmp):
+    """交接是终态：交接 --to owner 不进 owner、不进 stale。缺 --to 的报错不能对交接许诺「进待裁决清单」，
+    真这样落了要警告。"""
+    env = mkenv(tmp)
+    r = append(env, role="sa", item="x", status="交接")
+    check("交接缺 --to：报错不许诺进待裁决清单", r.returncode != 0 and "待裁决清单" not in out(r).split("交接是终态")[0]
+          and "交接是终态" in out(r), out(r)[:300])
+    r = append(env, role="sa", item="y", status="交接", to="owner", note="待负责人验收")
+    check("交接 --to owner 照常落账", r.returncode == 0, out(r)[:200])
+    check("交接 --to owner 警告不进待裁决清单", "警告" in r.stderr and "阻塞 --blocker-role owner" in r.stderr, r.stderr[:300])
+    r = append(env, role="sa", item="z", status="待评审", to="owner", note="请验收")
+    check("待评审 --to owner 不警告", "警告" not in r.stderr, r.stderr[:200])
+
+
 def t_owner_closed(tmp):
     """只看当前态——否则清单会被已收口的历史项淹掉，真待裁决的项反而看不见。"""
     env = mkenv(tmp)
@@ -518,7 +532,7 @@ def t_r2_error_hints_separator(tmp):
 ALL = [t_append, t_version_missing, t_reject, t_successor_required, t_owner_successor,
        t_item_clash, t_item_clash_scope, t_force_new_item,
        t_stale_quiet, t_stale_hours0, t_stale_owner_tag, t_stale_bad_ts, t_bad_line,
-       t_owner, t_owner_via_to, t_owner_closed, t_concurrent,
+       t_owner, t_owner_via_to, t_handoff_to_owner_warns, t_owner_closed, t_concurrent,
        t_removed_subcommands, t_removed_anchor_flags, t_no_md,
        t_ui_phase_alias, t_utc_offset,
        t_handoff_does_not_fold, t_complete_still_folds, t_part_rows, t_part_owner_and_validation,

@@ -99,6 +99,17 @@ def head(text, n):
     return lines[:n] + [f"  …另有 {len(lines) - n} 行（完整见 team-ledger.py 对应命令）"]
 
 
+def owner_compact(text):
+    """注入用：待裁决每项一行（去掉卡点行）、最新的在前。owner 命令按时间从旧到新列，
+    原样截前几行会把新交给负责人的项挤掉；完整清单仍以 team-ledger.py owner 为准。"""
+    lines = [l for l in text.splitlines() if l.strip()]
+    if not lines:
+        return ""
+    items = [l for l in lines[1:] if not l.lstrip().startswith("卡点：")]
+    title = lines[0].rstrip("：:") + "（每项一行、最新在前；卡点见 team-ledger.py owner）："
+    return "\n".join([title] + items[::-1])
+
+
 def session_start(root, led, payload):
     import checks
     if not os.path.exists(os.path.join(led, "ledger.jsonl")):
@@ -113,7 +124,7 @@ def session_start(root, led, payload):
                      + "（docs/rules/并行线.md「三」：开线要落账写分支名）")
     rc, owner = run_ledger(root, "owner")
     if rc != 0 and owner:
-        parts += head(owner, 10)
+        parts += head(owner_compact(owner), 10)
     rc, stale = run_ledger(root, "stale", "--hours", "0")
     if rc != 0 and stale:        # 待裁决的已在上面列过，这里不重复
         parts += head("\n".join(l for l in stale.splitlines() if "→ OWNER" not in l), 15)
@@ -263,6 +274,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except BaseException:      # noqa: BLE001 —— 只提醒的钩子：任何错误都不能影响会话
+    except BaseException:      # noqa: BLE001 —— 钩子出错一律放行：任何错误都不能影响会话
         pass
     sys.exit(0)

@@ -60,7 +60,7 @@ PM / UI / SE / QA 是 SA 值守会话的 **subagent**：任务由 SA 直接派�
 | `part` | 否 | 子产物名：同一工作项内并行推进的子产物（如主线 SE 开发时 PM 澄清其中一份）。行按 `(role, item, part)` 独立存活，`stale` / `owner` 显示为 `工作项/子产物`；子产物的事件**不参与整项收口** |
 | `phase` | 否 | 枚举（标注链路环节）：`requirement` / `design` / `ui-design` / `ui-proto` / `spec` / `plan` / `dev` / `ui-review` / `test-design` / `test-case` / `test` / `accept` / `review` / `deploy`（中文门名自动归一）。`ui-proto` 是 UI Web 原型（「UI设计」「界面设计」「原型」等中文门名都归到它）；`ui-design` 为兼容存量行保留，须显式写 slug |
 | `status` | 是 | 枚举：`进行中` / `待评审` / `评审中` / `阻塞` / `完成` / `交接`。终态 = `完成` / `交接`（行级：这一行不再计入停滞）；能让**整项**收口的只有 `完成` |
-| `to` | 条件 | 接续方角色；`status=交接` / `待评审` 时**必填** |
+| `to` | 条件 | 接续方角色；`status=交接` / `待评审` 时**必填**。非终态写 `owner` 也进待裁决清单；`交接` 是终态，`交接 --to owner` 不进（落账时警告） |
 | `blocker_role` | 条件 | 被卡方角色；`status=阻塞` 时**必填**。等产品负责人裁定写 `owner`，进待裁决清单 |
 | `blocker` | 条件 | 卡在什么；`status=阻塞` 时**必填** |
 | `round` | 否 | 评审轮次。契约「评审与合入」定**轮次封顶 1**：每份产物最多一轮评审，按同一 `item` 计 —— 换个名字就能重开一轮，所以 `item` 的同名硬拒是承重的，不是洁癖 |

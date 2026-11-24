@@ -371,6 +371,20 @@ def t_session_start_owner_via_to(tmp):
     check("阻塞 → owner 只出现一次", c.count("等他裁") == 1, c)
 
 
+def t_session_start_owner_newest_first(tmp):
+    """待裁决多时，注入只放得下前几行：每项一行、最新的在前，新交给负责人的不能被老项挤掉。"""
+    evs = [{"ts": f"2026-11-0{i} 10:00", "role": "sa", "item": f"老项{i}", "status": "阻塞",
+            "blocker_role": "owner", "blocker": "很长的卡点" * 5} for i in range(1, 10)]
+    evs.append({"ts": "2026-11-21 12:40", "role": "sa", "item": "最新交给负责人", "status": "待评审", "to": "owner"})
+    d, led = kit_project(tmp, evs)
+    r = hook("SessionStart", {"cwd": d, "session_id": "s1", "hook_event_name": "SessionStart", "source": "startup"},
+             {"TEAM_LEDGER_DIR": led}, cwd=d)
+    c = ctx(r)
+    check("最新交给负责人的项在注入里", "最新交给负责人" in c, c[:600])
+    check("注入里的待裁决每项一行（不带卡点行）", "卡点：" not in c, c[:600])
+    check("注入里最新的排在最前", c.find("最新交给负责人") < c.find("老项9") < c.find("老项8") if "老项8" in c else False, c[:600])
+
+
 def t_seen_file_corrupt_still_warns(tmp):
     d, led = kit_project(tmp)
     os.makedirs(os.path.join(led, "hooks"), exist_ok=True)
@@ -402,7 +416,7 @@ ALL = [t_scope, t_migrations, t_migration_dir_from_config, t_plan, t_lanes,
        t_subagent_stop_reminds_once, t_session_start_lanes_first, t_lane_worktree_edit,
        t_subagent_stop_continues_via_block, t_migrations_refs, t_seen_file_corrupt_still_warns,
        t_check_after_edit_trailing_comment, t_notebook_path, t_migrations_refs_missing_dir,
-       t_session_start_owner_via_to]
+       t_session_start_owner_via_to, t_session_start_owner_newest_first]
 
 
 def main():
