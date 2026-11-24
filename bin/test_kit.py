@@ -485,6 +485,37 @@ def t_ui_spec_reading_index():
     ok(set(re.findall(r"§(\d+(?:\.\d+)*)", always)) == {"0", "1", "2.4", "4", "20", "21", "22"},
        "「每次都读」恰为 §0、§1、§2.4、§4、§20、§21、§22")
 
+
+def t_profile_template_has_when_column():
+    t = open(os.path.join(kit.PROFILE, kit.PROFILE_DOC), encoding="utf-8").read()
+    sec = _section(t, "## 项目规范")
+    head = next((l for l in sec.splitlines() if l.startswith("|")), "")
+    ok("何时读" in head, f"模板「项目规范」表头有「何时读」（{head}）")
+    ok("动手前必读的项目规范" not in t, "模板删掉了「动手前必读的项目规范」一段")
+    ok("页面与组件命名约定" in sec, "「页面与组件命名约定」一段保留")
+
+
+def t_check_warns_missing_when_column():
+    d = new_repo()
+    run("install", d)
+    errors, warns = kit.check(d, quiet=True)
+    ok(not any("何时读" in w for w in warns), f"新装的工程配置有「何时读」：不警告（{warns}）")
+    p = os.path.join(d, kit.PROFILE_DOC)
+    s = open(p, encoding="utf-8").read()
+    old = s.replace("| 规范 | 位置 | 何时读 |\n|---|---|---|", "| 规范 | 位置 |\n|---|---|")
+    ok(old != s, "测试把表头改回两列")
+    open(p, "w", encoding="utf-8").write(old)
+    errors, warns = kit.check(d, quiet=True)
+    ok(kit.WHEN_COL_WARN in warns, f"表头缺「何时读」给出警告（{warns}）")
+    ok(not any("何时读" in e for e in errors), "缺列不算错")
+    rc, _ = run("check", d)
+    ok(rc == 0, "只缺「何时读」时 check 退出 0")
+    sec = _section(old, "## 项目规范")
+    open(p, "w", encoding="utf-8").write(old.replace(sec, "\n无表\n"))
+    _, warns = kit.check(d, quiet=True)
+    ok(kit.WHEN_COL_WARN in warns, "「项目规范」有节无表也警告")
+    shutil.rmtree(d)
+
 def t_adopt_three_way_merges_disjoint_edits():
     with temp_kit() as k:
         d = new_repo()
